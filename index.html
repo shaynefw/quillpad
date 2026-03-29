@@ -10,72 +10,214 @@
 
     :root {
       --bg: #0f0f0f;
-      --surface: #1a1a1a;
-      --border: #2e2e2e;
+      --surface: #161616;
+      --sidebar: #131313;
+      --border: #2a2a2a;
       --text: #e8e8e8;
-      --muted: #666;
+      --muted: #5a5a5a;
+      --muted2: #888;
       --accent: #7c6af7;
       --accent-hover: #9180ff;
-      --btn-bg: #242424;
-      --btn-hover: #2f2f2f;
+      --btn-bg: #222;
+      --btn-hover: #2c2c2c;
+      --note-hover: #1e1e1e;
+      --note-active: #242236;
     }
 
     [data-theme="light"] {
-      --bg: #f5f5f4;
+      --bg: #f0efee;
       --surface: #ffffff;
-      --border: #e0dedd;
+      --sidebar: #e8e7e6;
+      --border: #d8d7d6;
       --text: #1c1b1a;
-      --muted: #999;
+      --muted: #aaa;
+      --muted2: #888;
       --accent: #6254e8;
       --accent-hover: #7060f5;
-      --btn-bg: #efefef;
-      --btn-hover: #e3e3e3;
+      --btn-bg: #ececec;
+      --btn-hover: #e3e2e1;
+      --note-hover: #e2e1e0;
+      --note-active: #dddaf8;
     }
 
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      transition: background 0.2s, color 0.2s;
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background 0.2s, color 0.2s; }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
 
-    .app {
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 0 16px;
+      transition: transform 0.22s ease, width 0.22s ease;
+      overflow: hidden;
     }
 
-    /* Header */
-    header {
+    .sidebar.collapsed {
+      width: 0;
+      min-width: 0;
+      border-right: none;
+    }
+
+    .sidebar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 0 14px;
+      padding: 14px 12px 10px;
       border-bottom: 1px solid var(--border);
-      gap: 12px;
+      flex-shrink: 0;
     }
 
     .wordmark {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
+    }
+
+    .wordmark svg { color: var(--accent); flex-shrink: 0; }
+
+    .wordmark span {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+
+    .new-note-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted2);
+      padding: 5px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s, background 0.15s;
       flex-shrink: 0;
     }
 
-    .wordmark svg {
-      color: var(--accent);
+    .new-note-btn:hover { color: var(--accent); background: var(--btn-hover); }
+
+    .notes-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
     }
 
-    .wordmark span {
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.3px;
+    .notes-list::-webkit-scrollbar { width: 4px; }
+    .notes-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .note-item {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 8px 10px;
+      cursor: pointer;
+      border-radius: 7px;
+      margin: 1px 6px;
+      transition: background 0.12s;
+      min-width: 0;
+    }
+
+    .note-item:hover { background: var(--note-hover); }
+    .note-item.active { background: var(--note-active); }
+
+    .note-item-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .note-item-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       color: var(--text);
     }
+
+    .note-item.active .note-item-title { color: var(--accent); }
+
+    .note-item-preview {
+      font-size: 0.72rem;
+      color: var(--muted2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+
+    .note-item-date {
+      font-size: 0.65rem;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .note-delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 3px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.12s, color 0.12s, background 0.12s;
+      display: flex;
+      align-items: center;
+    }
+
+    .note-item:hover .note-delete-btn { opacity: 1; }
+    .note-delete-btn:hover { color: #e05c5c; background: rgba(224,92,92,0.12); }
+
+    .sidebar-empty {
+      padding: 20px 14px;
+      font-size: 0.78rem;
+      color: var(--muted2);
+      text-align: center;
+    }
+
+    /* ── Main ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .sidebar-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted2);
+      padding: 5px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .sidebar-toggle:hover { color: var(--text); background: var(--btn-hover); }
 
     .title-input {
       flex: 1;
@@ -84,17 +226,16 @@
       outline: none;
       font-size: 0.95rem;
       color: var(--text);
-      text-align: center;
-      font-weight: 500;
+      font-weight: 600;
       min-width: 0;
     }
 
-    .title-input::placeholder { color: var(--muted); }
+    .title-input::placeholder { color: var(--muted); font-weight: 400; }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
     }
 
@@ -102,7 +243,7 @@
       background: none;
       border: none;
       cursor: pointer;
-      color: var(--muted);
+      color: var(--muted2);
       padding: 6px;
       border-radius: 8px;
       display: flex;
@@ -112,12 +253,12 @@
 
     .icon-btn:hover { color: var(--text); background: var(--btn-hover); }
 
-    /* Toolbar */
+    /* ── Toolbar ── */
     .toolbar {
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 10px 0;
+      padding: 8px 20px;
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
     }
@@ -126,7 +267,7 @@
       background: none;
       border: none;
       cursor: pointer;
-      color: var(--muted);
+      color: var(--muted2);
       padding: 5px 8px;
       border-radius: 6px;
       font-size: 0.8rem;
@@ -138,19 +279,13 @@
     }
 
     .toolbar-btn:hover { color: var(--text); background: var(--btn-hover); }
-    .toolbar-btn.active { color: var(--accent); background: var(--btn-bg); }
 
-    .toolbar-divider {
-      width: 1px;
-      height: 20px;
-      background: var(--border);
-      margin: 0 4px;
-    }
+    .toolbar-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 
     select.font-select {
       background: none;
       border: none;
-      color: var(--muted);
+      color: var(--muted2);
       font-size: 0.8rem;
       cursor: pointer;
       padding: 5px 6px;
@@ -162,11 +297,11 @@
 
     select.font-select:hover { color: var(--text); background: var(--btn-hover); }
 
-    /* Editor */
+    /* ── Editor ── */
     .editor-wrap {
       flex: 1;
       overflow: hidden;
-      padding: 20px 0;
+      padding: 20px 20px 0;
     }
 
     #editor {
@@ -185,60 +320,43 @@
 
     #editor::placeholder { color: var(--muted); }
 
-    /* Footer */
+    /* ── Footer ── */
     footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 0 20px;
+      padding: 10px 20px 18px;
       border-top: 1px solid var(--border);
       gap: 12px;
       flex-wrap: wrap;
     }
 
-    .stats {
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
+    .stats { font-size: 0.72rem; color: var(--muted2); }
 
-    .download-group {
-      display: flex;
-      gap: 8px;
-    }
+    .download-group { display: flex; gap: 8px; }
 
     .dl-btn {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
+      padding: 7px 13px;
       border: 1px solid var(--border);
       border-radius: 8px;
       background: var(--btn-bg);
       color: var(--text);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s, transform 0.1s;
-      letter-spacing: 0.2px;
     }
 
-    .dl-btn:hover {
-      background: var(--btn-hover);
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
+    .dl-btn:hover { background: var(--btn-hover); border-color: var(--accent); transform: translateY(-1px); }
     .dl-btn:active { transform: translateY(0); }
 
-    .dl-btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-
+    .dl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     .dl-btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
-    /* Toast */
+    /* ── Toast ── */
     .toast {
       position: fixed;
       bottom: 28px;
@@ -255,43 +373,62 @@
       transition: opacity 0.2s, transform 0.2s;
       white-space: nowrap;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 100;
     }
 
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+    /* ── Mobile ── */
     @media (max-width: 600px) {
-      .title-input { display: none; }
-      .download-group { flex-wrap: wrap; }
+      .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 50; transform: translateX(-100%); width: 240px; min-width: 240px; }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 20px rgba(0,0,0,0.4); }
+      .sidebar.collapsed { transform: translateX(-100%); width: 240px; min-width: 240px; }
       .dl-btn span { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
       <div class="wordmark">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
         </svg>
         <span>Quillpad</span>
       </div>
+      <button class="new-note-btn" id="newNoteBtn" title="New note">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="notes-list" id="notesList"></div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <button class="sidebar-toggle" id="sidebarToggle" title="Toggle notes panel" aria-label="Toggle notes panel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+      </button>
       <input class="title-input" id="noteTitle" type="text" placeholder="Untitled note…" maxlength="80" />
       <div class="header-actions">
-        <button class="icon-btn" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
-          <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme">
+          <svg id="themeIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
             <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
             <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
           </svg>
         </button>
-        <button class="icon-btn" id="clearBtn" title="Clear note" aria-label="Clear note">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
-            <path d="M9 6V4h6v2"/>
+        <button class="icon-btn" id="clearBtn" title="Delete this note">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
           </svg>
         </button>
       </div>
@@ -304,9 +441,9 @@
         <option value="mono">Monospace</option>
       </select>
       <div class="toolbar-divider"></div>
-      <button class="toolbar-btn" id="btnBold" title="Bold (⌘B)" onclick="wrapSelection('**','**')"><b>B</b></button>
-      <button class="toolbar-btn" id="btnItalic" title="Italic (⌘I)" onclick="wrapSelection('_','_')"><i>I</i></button>
-      <button class="toolbar-btn" id="btnCode" title="Inline code" onclick="wrapSelection('`','`')">
+      <button class="toolbar-btn" title="Bold (⌘B)" onclick="wrapSelection('**','**')"><b>B</b></button>
+      <button class="toolbar-btn" title="Italic (⌘I)" onclick="wrapSelection('_','_')"><i>I</i></button>
+      <button class="toolbar-btn" title="Inline code" onclick="wrapSelection('`','`')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       </button>
       <div class="toolbar-divider"></div>
@@ -327,211 +464,344 @@
     </div>
 
     <footer>
-      <div class="stats" id="stats">0 words &middot; 0 chars</div>
+      <div class="stats" id="stats">0 words · 0 chars</div>
       <div class="download-group">
         <button class="dl-btn" onclick="downloadAs('txt')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>.TXT</span>
         </button>
         <button class="dl-btn" onclick="downloadAs('md')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>.MD</span>
         </button>
         <button class="dl-btn primary" onclick="downloadAs('pdf')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>.PDF</span>
         </button>
       </div>
     </footer>
   </div>
+</div>
 
-  <div class="toast" id="toast"></div>
+<div class="toast" id="toast"></div>
 
-  <script>
-    const editor = document.getElementById('editor');
-    const statsEl = document.getElementById('stats');
-    const titleEl = document.getElementById('noteTitle');
-    const toastEl = document.getElementById('toast');
+<script>
+  const editor    = document.getElementById('editor');
+  const statsEl   = document.getElementById('stats');
+  const titleEl   = document.getElementById('noteTitle');
+  const toastEl   = document.getElementById('toast');
+  const notesList = document.getElementById('notesList');
+  const sidebar   = document.getElementById('sidebar');
 
-    const FONTS = {
-      sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      serif: 'Georgia, "Times New Roman", serif',
-      mono: '"SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace'
-    };
+  const FONTS = {
+    sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: '"SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace'
+  };
 
-    // Persist to localStorage
-    function save() {
-      localStorage.setItem('quillpad_content', editor.value);
-      localStorage.setItem('quillpad_title', titleEl.value);
+  // ── Notes store ──────────────────────────────────────────
+  function loadNotes() {
+    try { return JSON.parse(localStorage.getItem('quillpad_notes')) || []; }
+    catch { return []; }
+  }
+
+  function saveNotes(notes) {
+    localStorage.setItem('quillpad_notes', JSON.stringify(notes));
+  }
+
+  function getActiveId() { return localStorage.getItem('quillpad_activeId'); }
+  function setActiveId(id) { localStorage.setItem('quillpad_activeId', id); }
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function createNote() {
+    return { id: uid(), title: '', content: '', updatedAt: Date.now() };
+  }
+
+  // ── Render sidebar list ───────────────────────────────────
+  function renderList() {
+    const notes = loadNotes();
+    const activeId = getActiveId();
+    notesList.innerHTML = '';
+
+    if (!notes.length) {
+      notesList.innerHTML = '<div class="sidebar-empty">No notes yet.<br>Hit + to create one.</div>';
+      return;
     }
 
-    function load() {
-      editor.value = localStorage.getItem('quillpad_content') || '';
-      titleEl.value = localStorage.getItem('quillpad_title') || '';
-      const theme = localStorage.getItem('quillpad_theme') || 'dark';
-      document.body.dataset.theme = theme;
-      updateThemeIcon(theme);
-      const font = localStorage.getItem('quillpad_font') || 'sans';
-      document.getElementById('fontSelect').value = font;
-      editor.style.fontFamily = FONTS[font];
-      updateStats();
-    }
+    // Sort newest-updated first
+    const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 
-    editor.addEventListener('input', () => { updateStats(); save(); });
-    titleEl.addEventListener('input', save);
+    sorted.forEach(note => {
+      const item = document.createElement('div');
+      item.className = 'note-item' + (note.id === activeId ? ' active' : '');
+      item.dataset.id = note.id;
 
-    function updateStats() {
-      const text = editor.value.trim();
-      const words = text ? text.split(/\s+/).length : 0;
-      const chars = editor.value.length;
-      statsEl.textContent = `${words.toLocaleString()} word${words !== 1 ? 's' : ''} · ${chars.toLocaleString()} char${chars !== 1 ? 's' : ''}`;
-    }
+      const preview = note.content.replace(/\n/g, ' ').trim().slice(0, 60) || '—';
+      const date = formatDate(note.updatedAt);
 
-    // Font selector
-    document.getElementById('fontSelect').addEventListener('change', (e) => {
-      editor.style.fontFamily = FONTS[e.target.value];
-      localStorage.setItem('quillpad_font', e.target.value);
-    });
+      item.innerHTML = `
+        <div class="note-item-body">
+          <div class="note-item-title">${escHtml(note.title || 'Untitled note')}</div>
+          <div class="note-item-preview">${escHtml(preview)}</div>
+          <div class="note-item-date">${date}</div>
+        </div>
+        <button class="note-delete-btn" data-id="${note.id}" title="Delete note" aria-label="Delete note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>`;
 
-    // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', () => {
-      const next = document.body.dataset.theme === 'light' ? 'dark' : 'light';
-      document.body.dataset.theme = next;
-      localStorage.setItem('quillpad_theme', next);
-      updateThemeIcon(next);
-    });
-
-    function updateThemeIcon(theme) {
-      const icon = document.getElementById('themeIcon');
-      if (theme === 'light') {
-        icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-      } else {
-        icon.innerHTML = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
-      }
-    }
-
-    // Clear
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      if (!editor.value && !titleEl.value) return;
-      if (confirm('Clear note? This cannot be undone.')) {
-        editor.value = '';
-        titleEl.value = '';
-        save();
-        updateStats();
-        editor.focus();
-      }
-    });
-
-    // Markdown helpers
-    function wrapSelection(before, after) {
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      const selected = editor.value.slice(start, end);
-      const replacement = before + selected + after;
-      editor.setRangeText(replacement, start, end, 'select');
-      editor.focus();
-      save();
-    }
-
-    function insertPrefix(prefix) {
-      const start = editor.selectionStart;
-      const lineStart = editor.value.lastIndexOf('\n', start - 1) + 1;
-      editor.setRangeText(prefix, lineStart, lineStart, 'end');
-      editor.focus();
-      save();
-    }
-
-    // Keyboard shortcuts
-    editor.addEventListener('keydown', (e) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === 'b') { e.preventDefault(); wrapSelection('**', '**'); }
-      if (mod && e.key === 'i') { e.preventDefault(); wrapSelection('_', '_'); }
-      // Tab inserts 2 spaces
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const s = editor.selectionStart;
-        editor.setRangeText('  ', s, s, 'end');
-        save();
-      }
-    });
-
-    // Downloads
-    function getFilename(ext) {
-      const title = titleEl.value.trim() || 'note';
-      return title.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext;
-    }
-
-    function downloadAs(type) {
-      const content = editor.value;
-      if (!content.trim()) { showToast('Nothing to download yet.'); return; }
-
-      if (type === 'txt') {
-        triggerDownload(new Blob([content], { type: 'text/plain' }), getFilename('txt'));
-      } else if (type === 'md') {
-        triggerDownload(new Blob([content], { type: 'text/markdown' }), getFilename('md'));
-      } else if (type === 'pdf') {
-        generatePDF(content);
-      }
-      showToast(`Downloaded as ${getFilename(type)}`);
-    }
-
-    function triggerDownload(blob, filename) {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
-
-    function generatePDF(content) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-      const margin = 60;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const maxWidth = pageWidth - margin * 2;
-      const title = titleEl.value.trim();
-      let y = margin;
-
-      if (title) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text(title, margin, y);
-        y += 28;
-        doc.setDrawColor(180);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 20;
-      }
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.setLineHeightFactor(1.6);
-
-      const lines = doc.splitTextToSize(content, maxWidth);
-      const lineHeight = 11 * 1.6;
-      const pageHeight = doc.internal.pageSize.getHeight();
-
-      lines.forEach(line => {
-        if (y + lineHeight > pageHeight - margin) {
-          doc.addPage();
-          y = margin;
-        }
-        doc.text(line, margin, y);
-        y += lineHeight;
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.note-delete-btn')) return;
+        switchNote(note.id);
       });
 
-      doc.save(getFilename('pdf'));
+      item.querySelector('.note-delete-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteNote(note.id);
+      });
+
+      notesList.appendChild(item);
+    });
+  }
+
+  // ── Switch active note ────────────────────────────────────
+  function switchNote(id) {
+    setActiveId(id);
+    const notes = loadNotes();
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    titleEl.value = note.title;
+    editor.value = note.content;
+    updateStats();
+    renderList();
+    editor.focus();
+    // Close sidebar on mobile after switching
+    if (window.innerWidth <= 600) sidebar.classList.remove('open');
+  }
+
+  // ── Save current note ─────────────────────────────────────
+  function saveActive() {
+    const id = getActiveId();
+    if (!id) return;
+    const notes = loadNotes();
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return;
+    notes[idx].title = titleEl.value;
+    notes[idx].content = editor.value;
+    notes[idx].updatedAt = Date.now();
+    saveNotes(notes);
+    renderList();
+  }
+
+  editor.addEventListener('input', () => { updateStats(); saveActive(); });
+  titleEl.addEventListener('input', saveActive);
+
+  // ── New note ──────────────────────────────────────────────
+  document.getElementById('newNoteBtn').addEventListener('click', () => {
+    const note = createNote();
+    const notes = loadNotes();
+    notes.unshift(note);
+    saveNotes(notes);
+    switchNote(note.id);
+  });
+
+  // ── Delete note ───────────────────────────────────────────
+  function deleteNote(id) {
+    let notes = loadNotes();
+    if (notes.length === 1) {
+      // Replace with a fresh blank note instead of leaving empty state
+      const fresh = createNote();
+      saveNotes([fresh]);
+      switchNote(fresh.id);
+      showToast('Note cleared.');
+      return;
+    }
+    notes = notes.filter(n => n.id !== id);
+    saveNotes(notes);
+    if (getActiveId() === id) {
+      const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+      switchNote(sorted[0].id);
+    } else {
+      renderList();
+    }
+    showToast('Note deleted.');
+  }
+
+  // Trash icon in header deletes current note
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    const id = getActiveId();
+    if (!id) return;
+    const notes = loadNotes();
+    const note = notes.find(n => n.id === id);
+    const hasContent = note && (note.title || note.content);
+    if (hasContent && !confirm('Delete this note?')) return;
+    deleteNote(id);
+  });
+
+  // ── Sidebar toggle ────────────────────────────────────────
+  document.getElementById('sidebarToggle').addEventListener('click', () => {
+    if (window.innerWidth <= 600) {
+      sidebar.classList.toggle('open');
+    } else {
+      sidebar.classList.toggle('collapsed');
+    }
+  });
+
+  // ── Stats ─────────────────────────────────────────────────
+  function updateStats() {
+    const text = editor.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    statsEl.textContent = `${words.toLocaleString()} word${words !== 1 ? 's' : ''} · ${editor.value.length.toLocaleString()} chars`;
+  }
+
+  // ── Font ──────────────────────────────────────────────────
+  document.getElementById('fontSelect').addEventListener('change', (e) => {
+    editor.style.fontFamily = FONTS[e.target.value];
+    localStorage.setItem('quillpad_font', e.target.value);
+  });
+
+  // ── Theme ─────────────────────────────────────────────────
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const next = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+    document.body.dataset.theme = next;
+    localStorage.setItem('quillpad_theme', next);
+    updateThemeIcon(next);
+  });
+
+  function updateThemeIcon(theme) {
+    const icon = document.getElementById('themeIcon');
+    icon.innerHTML = theme === 'light'
+      ? `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`
+      : `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+  }
+
+  // ── Markdown helpers ──────────────────────────────────────
+  function wrapSelection(before, after) {
+    const s = editor.selectionStart, e2 = editor.selectionEnd;
+    editor.setRangeText(before + editor.value.slice(s, e2) + after, s, e2, 'select');
+    editor.focus(); saveActive();
+  }
+
+  function insertPrefix(prefix) {
+    const s = editor.selectionStart;
+    const ls = editor.value.lastIndexOf('\n', s - 1) + 1;
+    editor.setRangeText(prefix, ls, ls, 'end');
+    editor.focus(); saveActive();
+  }
+
+  editor.addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key === 'b') { e.preventDefault(); wrapSelection('**', '**'); }
+    if (mod && e.key === 'i') { e.preventDefault(); wrapSelection('_', '_'); }
+    if (e.key === 'Tab') { e.preventDefault(); const s = editor.selectionStart; editor.setRangeText('  ', s, s, 'end'); saveActive(); }
+  });
+
+  // ── Downloads ─────────────────────────────────────────────
+  function getFilename(ext) {
+    const title = titleEl.value.trim() || 'note';
+    return title.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext;
+  }
+
+  function downloadAs(type) {
+    const content = editor.value;
+    if (!content.trim()) { showToast('Nothing to download yet.'); return; }
+    if (type === 'txt') triggerDownload(new Blob([content], { type: 'text/plain' }), getFilename('txt'));
+    else if (type === 'md') triggerDownload(new Blob([content], { type: 'text/markdown' }), getFilename('md'));
+    else if (type === 'pdf') generatePDF(content);
+    if (type !== 'pdf') showToast(`Downloaded as ${getFilename(type)}`);
+  }
+
+  function triggerDownload(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function generatePDF(content) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    const margin = 60, pageWidth = doc.internal.pageSize.getWidth();
+    const maxWidth = pageWidth - margin * 2;
+    const title = titleEl.value.trim();
+    let y = margin;
+    if (title) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+      doc.text(title, margin, y); y += 28;
+      doc.setDrawColor(180); doc.line(margin, y, pageWidth - margin, y); y += 20;
+    }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setLineHeightFactor(1.6);
+    const lines = doc.splitTextToSize(content, maxWidth);
+    const lineHeight = 11 * 1.6, pageHeight = doc.internal.pageSize.getHeight();
+    lines.forEach(line => {
+      if (y + lineHeight > pageHeight - margin) { doc.addPage(); y = margin; }
+      doc.text(line, margin, y); y += lineHeight;
+    });
+    doc.save(getFilename('pdf'));
+    showToast(`Downloaded as ${getFilename('pdf')}`);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function formatDate(ts) {
+    const d = new Date(ts), now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400 && d.getDate() === now.getDate()) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    if (diff < 86400 * 7) return d.toLocaleDateString([], {weekday:'short'});
+    return d.toLocaleDateString([], {month:'short', day:'numeric'});
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  }
+
+  // ── Boot ──────────────────────────────────────────────────
+  function boot() {
+    // Migrate legacy single-note data
+    const legacyContent = localStorage.getItem('quillpad_content');
+    const legacyTitle   = localStorage.getItem('quillpad_title');
+    let notes = loadNotes();
+
+    if (!notes.length) {
+      const note = createNote();
+      note.title   = legacyTitle || '';
+      note.content = legacyContent || '';
+      notes = [note];
+      saveNotes(notes);
+      localStorage.removeItem('quillpad_content');
+      localStorage.removeItem('quillpad_title');
     }
 
-    // Toast
-    let toastTimer;
-    function showToast(msg) {
-      toastEl.textContent = msg;
-      toastEl.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+    // Ensure active id is valid
+    let activeId = getActiveId();
+    if (!activeId || !notes.find(n => n.id === activeId)) {
+      const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+      activeId = sorted[0].id;
+      setActiveId(activeId);
     }
 
-    load();
-  </script>
+    const theme = localStorage.getItem('quillpad_theme') || 'dark';
+    document.body.dataset.theme = theme;
+    updateThemeIcon(theme);
+
+    const font = localStorage.getItem('quillpad_font') || 'sans';
+    document.getElementById('fontSelect').value = font;
+    editor.style.fontFamily = FONTS[font];
+
+    renderList();
+    switchNote(activeId);
+  }
+
+  boot();
+</script>
 </body>
 </html>
