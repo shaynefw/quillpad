@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quillpad</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -271,6 +272,11 @@
         <span>Quillpad</span>
       </div>
       <div class="sidebar-actions">
+        <button class="sb-btn" id="backupAllBtn" title="Backup all notes (.zip)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
         <button class="sb-btn" id="newFolderBtn" title="New folder">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -842,6 +848,46 @@
     doc.save(getFilename('pdf'));
     showToast(`Downloaded as ${getFilename('pdf')}`);
   }
+
+  // ── Backup All ────────────────────────────────────────────
+  document.getElementById('backupAllBtn').addEventListener('click', async () => {
+    const notes = loadNotes();
+    const folders = loadFolders();
+    if (!notes.length) { showToast('No notes to backup.'); return; }
+
+    const zip = new JSZip();
+    const usedNames = {};
+
+    function safeName(title, folder) {
+      let base = (title || 'Untitled note').replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-').toLowerCase();
+      const key = (folder || '') + '/' + base;
+      if (usedNames[key]) { usedNames[key]++; base += '-' + usedNames[key]; }
+      else { usedNames[key] = 1; }
+      return base + '.txt';
+    }
+
+    const folderMap = {};
+    folders.forEach(f => { folderMap[f.id] = f.name || 'Untitled Folder'; });
+
+    notes.forEach(note => {
+      const content = note.content || '';
+      if (note.folderId && folderMap[note.folderId]) {
+        const folderName = folderMap[note.folderId].replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-');
+        zip.file(folderName + '/' + safeName(note.title, folderName), content);
+      } else {
+        zip.file(safeName(note.title, null), content);
+      }
+    });
+
+    try {
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const date = new Date().toISOString().slice(0, 10);
+      triggerDownload(blob, `quillpad-backup-${date}.zip`);
+      showToast(`Backup downloaded — ${notes.length} note${notes.length !== 1 ? 's' : ''}`);
+    } catch (err) {
+      showToast('Backup failed: ' + err.message);
+    }
+  });
 
   // ── Helpers ───────────────────────────────────────────────
   const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
