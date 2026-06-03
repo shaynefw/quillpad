@@ -266,6 +266,21 @@
       padding: 9px 20px 16px; border-top: 1px solid var(--border); gap: 12px; flex-wrap: wrap;
     }
     .stats { font-size: 0.72rem; color: var(--muted2); }
+    .last-backup {
+      font-size: 0.72rem; color: var(--muted2);
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; padding: 4px 8px; border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .last-backup:hover { background: var(--btn-hover); color: var(--text); }
+    .last-backup-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #4ade80; flex-shrink: 0;
+    }
+    .last-backup-dot.fresh  { background: #4ade80; }
+    .last-backup-dot.aging  { background: #facc15; }
+    .last-backup-dot.stale  { background: #fb923c; }
+    .last-backup-dot.danger { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,0.6); }
     .download-group { display: flex; gap: 8px; }
     .dl-btn {
       display: flex; align-items: center; gap: 6px; padding: 7px 13px;
@@ -411,6 +426,10 @@
 
     <footer>
       <div class="stats" id="stats">0 words · 0 chars</div>
+      <div class="last-backup" id="lastBackupText" title="Click to back up now">
+        <span class="last-backup-dot" id="lastBackupDot"></span>
+        <span id="lastBackupLabel">Never backed up</span>
+      </div>
       <div class="download-group">
         <button class="dl-btn" onclick="downloadAs('txt')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1050,6 +1069,9 @@
     const banner = document.getElementById('backupBanner');
     const bTitle = document.getElementById('backupBannerTitle');
     const bSub = document.getElementById('backupBannerSub');
+    const footerDot = document.getElementById('lastBackupDot');
+    const footerLabel = document.getElementById('lastBackupLabel');
+    const footerWrap = document.getElementById('lastBackupText');
     if (!dot || !btn) return;
 
     const notes = loadNotes();
@@ -1061,24 +1083,41 @@
       dot.style.display = 'none';
       banner.classList.remove('visible');
       btn.title = 'Backup all notes (.zip)';
+      if (footerWrap) footerWrap.style.display = 'none';
       return;
     }
     dot.style.display = '';
+    if (footerWrap) footerWrap.style.display = '';
 
-    let cls = 'fresh', label, days;
+    let cls = 'fresh', label, footerText, days;
     if (!last) {
       cls = 'danger';
       label = 'Never backed up';
+      footerText = 'Never backed up';
     } else {
       days = Math.floor((Date.now() - last) / 86400000);
-      if (days < 7)        { cls = 'fresh';  label = days === 0 ? 'Last backup: today' : `Last backup: ${days}d ago`; }
-      else if (days < 14)  { cls = 'aging';  label = `Last backup: ${days}d ago — consider backing up`; }
-      else if (days < 30)  { cls = 'stale';  label = `Last backup: ${days}d ago — back up soon`; }
-      else                 { cls = 'danger'; label = `Last backup: ${days}d ago — back up now`; }
+      const minutes = Math.floor((Date.now() - last) / 60000);
+      const hours = Math.floor((Date.now() - last) / 3600000);
+
+      let ago;
+      if (minutes < 1)      ago = 'just now';
+      else if (minutes < 60) ago = `${minutes} min${minutes !== 1 ? 's' : ''} ago`;
+      else if (hours < 24)   ago = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+      else                   ago = `${days} day${days !== 1 ? 's' : ''} ago`;
+
+      footerText = `Last backup: ${ago}`;
+
+      if (days < 7)        { cls = 'fresh';  label = `Last backup: ${ago}`; }
+      else if (days < 14)  { cls = 'aging';  label = `Last backup: ${ago} — consider backing up`; }
+      else if (days < 30)  { cls = 'stale';  label = `Last backup: ${ago} — back up soon`; }
+      else                 { cls = 'danger'; label = `Last backup: ${ago} — back up now`; }
     }
 
     dot.className = 'backup-dot ' + cls;
     btn.title = label;
+    if (footerDot)   footerDot.className = 'last-backup-dot ' + cls;
+    if (footerLabel) footerLabel.textContent = footerText;
+    if (footerWrap)  footerWrap.title = label === footerText ? 'Click to back up now' : label + ' · Click to back up now';
 
     // Banner: show on critical states unless dismissed within last 24h
     const dismissedRecently = dismissedAt && (Date.now() - dismissedAt) < 86400000;
@@ -1100,6 +1139,10 @@
   document.getElementById('backupBannerClose').addEventListener('click', () => {
     localStorage.setItem('quillpad_bannerDismissedAt', Date.now().toString());
     document.getElementById('backupBanner').classList.remove('visible');
+  });
+
+  document.getElementById('lastBackupText').addEventListener('click', () => {
+    document.getElementById('backupAllBtn').click();
   });
 
   // ── Helpers ───────────────────────────────────────────────
@@ -1150,8 +1193,8 @@
     renderTree();
     switchNote(activeId);
     updateBackupStatus();
-    // Re-check status every 5 minutes while the app is open (in case it crosses a day boundary)
-    setInterval(updateBackupStatus, 5 * 60 * 1000);
+    // Re-check status every minute so the "X mins ago" counter stays accurate
+    setInterval(updateBackupStatus, 60 * 1000);
   }
 
   boot();
