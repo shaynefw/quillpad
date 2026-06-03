@@ -312,6 +312,12 @@
         <span>Quillpad</span>
       </div>
       <div class="sidebar-actions">
+        <input type="file" id="restoreInput" accept=".zip,.txt,.md" multiple style="display:none" />
+        <button class="sb-btn" id="restoreBtn" title="Restore notes from backup (.zip / .txt / .md)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
         <button class="sb-btn" id="backupAllBtn" title="Backup all notes (.zip)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -948,6 +954,94 @@
       showToast('Backup failed: ' + err.message);
     }
   });
+
+  // ── Restore from backup ──────────────────────────────────
+  document.getElementById('restoreBtn').addEventListener('click', () => {
+    document.getElementById('restoreInput').click();
+  });
+
+  document.getElementById('restoreInput').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-uploading same file
+    if (!files.length) return;
+
+    try {
+      const imported = await importFiles(files);
+      if (imported.notes === 0) { showToast('No notes found in upload.'); return; }
+      const folderMsg = imported.folders ? `, ${imported.folders} folder${imported.folders !== 1 ? 's' : ''}` : '';
+      showToast(`Imported ${imported.notes} note${imported.notes !== 1 ? 's' : ''}${folderMsg}`);
+    } catch (err) {
+      showToast('Import failed: ' + err.message);
+    }
+  });
+
+  async function importFiles(files) {
+    const existingFolders = loadFolders();
+    const existingNotes = loadNotes();
+    let notesAdded = 0, foldersAdded = 0;
+
+    // Build folder name lookup (case-insensitive) — reuse existing folders by name
+    const folderByName = {};
+    existingFolders.forEach(f => { folderByName[f.name.toLowerCase()] = f.id; });
+
+    function ensureFolder(rawName) {
+      const name = rawName.replace(/[\/\\]+/g, ' ').trim();
+      if (!name) return null;
+      const key = name.toLowerCase();
+      if (folderByName[key]) return folderByName[key];
+      const folder = { id: uid(), name, collapsed: false };
+      existingFolders.push(folder);
+      folderByName[key] = folder.id;
+      foldersAdded++;
+      return folder.id;
+    }
+
+    function addNote(title, content, folderId) {
+      const note = {
+        id: uid(),
+        title: title || '',
+        content: content || '',
+        folderId: folderId || null,
+        updatedAt: Date.now()
+      };
+      existingNotes.unshift(note);
+      notesAdded++;
+    }
+
+    for (const file of files) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.zip')) {
+        const zip = await JSZip.loadAsync(file);
+        // Sort so folders process consistently
+        const entries = Object.values(zip.files).sort((a, b) => a.name.localeCompare(b.name));
+        for (const entry of entries) {
+          if (entry.dir) continue;
+          // Only import text-like files
+          const lower = entry.name.toLowerCase();
+          if (!lower.endsWith('.txt') && !lower.endsWith('.md')) continue;
+          const path = entry.name.split('/').filter(Boolean);
+          const filename = path.pop();
+          const folderPath = path.join(' / '); // collapse nested folders into one name
+          const folderId = folderPath ? ensureFolder(folderPath) : null;
+          const content = await entry.async('string');
+          const title = filename.replace(/\.(txt|md)$/i, '').replace(/-/g, ' ');
+          addNote(title, content, folderId);
+        }
+      } else if (name.endsWith('.txt') || name.endsWith('.md')) {
+        const content = await file.text();
+        const title = file.name.replace(/\.(txt|md)$/i, '').replace(/-/g, ' ');
+        addNote(title, content, null);
+      }
+    }
+
+    if (notesAdded > 0 || foldersAdded > 0) {
+      saveFolders(existingFolders);
+      saveNotes(existingNotes);
+      renderTree();
+      updateBackupStatus();
+    }
+    return { notes: notesAdded, folders: foldersAdded };
+  }
 
   // ── Backup status indicator ──────────────────────────────
   function updateBackupStatus() {
