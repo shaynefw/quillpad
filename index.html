@@ -11,26 +11,26 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0f0f0f;
-      --surface: #161616;
-      --sidebar: #131313;
-      --border: #2a2a2a;
-      --text: #e8e8e8;
-      --muted: #555;
-      --muted2: #888;
+      --bg: #131020;
+      --surface: #1a1626;
+      --sidebar: #17131f;
+      --border: #2d2740;
+      --text: #e9e6f2;
+      --muted: #5a5470;
+      --muted2: #928caa;
       --accent: #7c6af7;
       --accent-hover: #9180ff;
-      --btn-bg: #222;
-      --btn-hover: #2c2c2c;
-      --item-hover: #1e1e1e;
-      --item-active: #242236;
-      --folder-active: #1d1c2e;
+      --btn-bg: #262035;
+      --btn-hover: #322a45;
+      --item-hover: #221d33;
+      --item-active: #2a2340;
+      --folder-active: #241f38;
     }
     [data-theme="light"] {
-      --bg: #f0efee; --surface: #ffffff; --sidebar: #e8e7e6; --border: #d8d7d6;
-      --text: #1c1b1a; --muted: #bbb; --muted2: #888; --accent: #6254e8;
-      --accent-hover: #7060f5; --btn-bg: #ececec; --btn-hover: #e3e2e1;
-      --item-hover: #e2e1e0; --item-active: #dddaf8; --folder-active: #e0ddf5;
+      --bg: #e8e3fa; --surface: #f6f3ff; --sidebar: #ded7f4; --border: #cfc6ec;
+      --text: #221d38; --muted: #b3aad0; --muted2: #7d75a0; --accent: #6254e8;
+      --accent-hover: #7060f5; --btn-bg: #e4ddf7; --btn-hover: #dad1f1;
+      --item-hover: #ded6f5; --item-active: #d3c9f6; --folder-active: #d8cff6;
     }
 
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
@@ -177,6 +177,37 @@
 
     .note-item-actions { display: flex; gap: 1px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s; }
     .note-item:hover .note-item-actions { opacity: 1; }
+
+    /* ── Multi-select ── */
+    .note-check {
+      flex-shrink: 0; width: 15px; height: 15px; margin-right: 8px;
+      border: 1.5px solid var(--muted2); border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; transition: background 0.12s, border-color 0.12s;
+    }
+    .note-check svg { opacity: 0; }
+    .note-item.selected .note-check { background: var(--accent); border-color: var(--accent); }
+    .note-item.selected .note-check svg { opacity: 1; }
+    .note-item.selected { background: var(--item-active); }
+    .sidebar.selecting .note-item-actions { display: none; }
+    .sb-btn.active-btn { color: var(--accent); background: var(--btn-hover); }
+
+    .bulk-bar {
+      display: none; flex-direction: column; gap: 7px;
+      padding: 10px 12px; border-top: 1px solid var(--border);
+      background: var(--sidebar);
+    }
+    .sidebar.selecting .bulk-bar { display: flex; }
+    .bulk-count { font-size: 0.72rem; font-weight: 600; color: var(--muted2); }
+    .bulk-actions { display: flex; gap: 5px; }
+    .bulk-btn {
+      flex: 1; padding: 6px 4px; border-radius: 6px; cursor: pointer;
+      background: var(--btn-bg); border: 1px solid var(--border); color: var(--text);
+      font-size: 0.74rem; font-weight: 600; transition: background 0.12s, color 0.12s;
+    }
+    .bulk-btn:hover { background: var(--btn-hover); }
+    .bulk-btn.danger:hover { background: rgba(224,92,92,0.15); color: #e05c5c; border-color: rgba(224,92,92,0.4); }
+    .bulk-btn:disabled { opacity: 0.4; cursor: default; }
 
     /* Section label (Unfiled) */
     .section-label {
@@ -339,6 +370,11 @@
           </svg>
           <span class="backup-dot" id="backupDot"></span>
         </button>
+        <button class="sb-btn" id="selectBtn" title="Select notes (bulk move / delete)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+        </button>
         <button class="sb-btn" id="newFolderBtn" title="New folder">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -366,6 +402,15 @@
       </button>
     </div>
     <div class="tree" id="tree"></div>
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-count" id="bulkCount">0 selected</span>
+      <div class="bulk-actions">
+        <button class="bulk-btn" id="bulkSelectAll" title="Select all notes">All</button>
+        <button class="bulk-btn" id="bulkMove" title="Move selected to a folder">Move</button>
+        <button class="bulk-btn danger" id="bulkDelete" title="Delete selected notes">Delete</button>
+        <button class="bulk-btn" id="bulkCancel" title="Exit selection">Done</button>
+      </div>
+    </div>
   </aside>
 
   <!-- Main -->
@@ -470,6 +515,8 @@
 
   // ── State ─────────────────────────────────────────────────
   let activeFolderId = null; // folder context for new notes
+  let selectMode = false;                 // bulk-selection mode
+  const selectedNotes = new Set();        // ids of selected notes
 
   // ── Storage ───────────────────────────────────────────────
   const loadNotes   = () => { try { return JSON.parse(localStorage.getItem('quillpad_notes'))   || []; } catch { return []; } };
@@ -623,15 +670,21 @@
 
   function buildNoteItem(note, indented, activeId, depth = 0) {
     const item = document.createElement('div');
-    item.className = 'note-item' + (indented ? ' indented' : '') + (note.id === activeId ? ' active' : '');
+    const isSel = selectMode && selectedNotes.has(note.id);
+    item.className = 'note-item' + (indented ? ' indented' : '') + (note.id === activeId ? ' active' : '') + (isSel ? ' selected' : '');
     item.dataset.noteId = note.id;
-    item.draggable = true;
+    item.draggable = !selectMode;
     if (indented && depth > 0) item.style.paddingLeft = (28 + depth * 14) + 'px';
 
-    item.innerHTML = `
+    const checkbox = selectMode ? `
+      <span class="note-check">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </span>` : `
       <span class="note-file-icon">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      </span>
+      </span>`;
+
+    item.innerHTML = `${checkbox}
       <div class="note-item-body">
         <div class="note-item-title">${escHtml(note.title || 'Untitled note')}</div>
         <div class="note-item-date">${formatDate(note.updatedAt)}</div>
@@ -644,11 +697,12 @@
 
     item.addEventListener('click', e => {
       if (e.target.closest('[data-action]')) return;
+      if (selectMode) { toggleNoteSelection(note.id, item); return; }
       switchNote(note.id);
     });
 
     item.querySelector('[data-action="delete-note"]').addEventListener('click', e => {
-      e.stopPropagation(); deleteNote(note.id);
+      e.stopPropagation(); confirmDeleteNote(note.id);
     });
 
     item.addEventListener('contextmenu', e => { e.preventDefault(); showNoteCtx(e, note.id); });
@@ -760,7 +814,7 @@
         e.stopPropagation();
         const action = item.dataset.action;
         if (action === 'move')              moveNoteToFolder(item.dataset.note, item.dataset.folder || null);
-        if (action === 'delete-note-ctx')   deleteNote(item.dataset.id);
+        if (action === 'delete-note-ctx')   confirmDeleteNote(item.dataset.id);
         if (action === 'rename-folder-ctx') { closeCtxMenu(); const row = treeEl.querySelector(`.folder-row[data-folder-id="${item.dataset.id}"]`); if (row) startFolderRename(item.dataset.id, row); }
         if (action === 'delete-folder-ctx') deleteFolder(item.dataset.id);
         if (action === 'new-note-in')       newNoteInFolder(item.dataset.folder);
@@ -905,6 +959,14 @@
     if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor.focus(); }
   });
 
+  function confirmDeleteNote(id) {
+    const note = loadNotes().find(n => n.id === id);
+    if (!note) return;
+    const label = (note.title || '').trim();
+    if (!confirm(label ? `Delete "${label}"? This can't be undone.` : "Delete this note? This can't be undone.")) return;
+    deleteNote(id);
+  }
+
   function deleteNote(id) {
     let notes = loadNotes();
     if (notes.length === 1) {
@@ -925,6 +987,105 @@
     if ((note?.title || note?.content) && !confirm('Delete this note?')) return;
     deleteNote(id);
   });
+
+  // ── Multi-select (bulk move / delete) ─────────────────────
+  const bulkBar   = document.getElementById('bulkBar');
+  const bulkCount = document.getElementById('bulkCount');
+
+  function setSelectMode(on) {
+    selectMode = on;
+    selectedNotes.clear();
+    sidebar.classList.toggle('selecting', on);
+    document.getElementById('selectBtn').classList.toggle('active-btn', on);
+    renderTree();
+    updateBulkBar();
+  }
+
+  function toggleNoteSelection(id, item) {
+    if (selectedNotes.has(id)) { selectedNotes.delete(id); item.classList.remove('selected'); }
+    else { selectedNotes.add(id); item.classList.add('selected'); }
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const n = selectedNotes.size;
+    bulkCount.textContent = n === 1 ? '1 selected' : `${n} selected`;
+    document.getElementById('bulkMove').disabled = n === 0;
+    document.getElementById('bulkDelete').disabled = n === 0;
+  }
+
+  document.getElementById('selectBtn').addEventListener('click', () => setSelectMode(!selectMode));
+  document.getElementById('bulkCancel').addEventListener('click', () => setSelectMode(false));
+
+  document.getElementById('bulkSelectAll').addEventListener('click', () => {
+    const all = loadNotes();
+    const allSelected = all.length > 0 && all.every(n => selectedNotes.has(n.id));
+    selectedNotes.clear();
+    if (!allSelected) all.forEach(n => selectedNotes.add(n.id));
+    renderTree();
+    updateBulkBar();
+  });
+
+  document.getElementById('bulkDelete').addEventListener('click', () => {
+    const ids = [...selectedNotes];
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} note${ids.length !== 1 ? 's' : ''}? This can't be undone.`)) return;
+    let notes = loadNotes().filter(n => !selectedNotes.has(n.id));
+    if (notes.length === 0) {
+      const fresh = { id: uid(), title: '', content: '', folderId: null, updatedAt: Date.now() };
+      notes = [fresh];
+    }
+    saveNotes(notes);
+    if (!notes.find(n => n.id === getActiveId())) {
+      const sorted = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+      setActiveId(sorted[0].id);
+    }
+    showToast(`${ids.length} note${ids.length !== 1 ? 's' : ''} deleted.`);
+    setSelectMode(false);
+    switchNote(getActiveId());
+    updateBackupStatus();
+  });
+
+  document.getElementById('bulkMove').addEventListener('click', e => {
+    if (!selectedNotes.size) return;
+    const folders = loadFolders();
+    let html = `<div class="ctx-section-title">Move ${selectedNotes.size} note${selectedNotes.size !== 1 ? 's' : ''} to</div>`;
+    html += `<div class="ctx-item" data-bulk-folder="">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Unfiled</div>`;
+    (function walk(parentId, depth) {
+      childFolders(folders, parentId).forEach(f => {
+        html += `<div class="ctx-item" data-bulk-folder="${f.id}" style="padding-left:${10 + depth * 14}px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          ${escHtml(f.name)}</div>`;
+        walk(f.id, depth + 1);
+      });
+    })(null, 0);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    openCtxMenu(rect.left, rect.top, html);
+    ctxMenu.querySelectorAll('[data-bulk-folder]').forEach(el => {
+      el.addEventListener('click', ev => {
+        ev.stopPropagation();
+        bulkMoveTo(el.dataset.bulkFolder || null);
+        closeCtxMenu();
+      });
+    });
+  });
+
+  function bulkMoveTo(folderId) {
+    const notes = loadNotes();
+    let count = 0;
+    notes.forEach(n => { if (selectedNotes.has(n.id)) { n.folderId = folderId || null; count++; } });
+    saveNotes(notes);
+    if (folderId) {
+      const folders = loadFolders();
+      const fi = folders.findIndex(f => f.id === folderId);
+      if (fi !== -1) { folders[fi].collapsed = false; saveFolders(folders); }
+    }
+    showToast(`${count} note${count !== 1 ? 's' : ''} moved.`);
+    setSelectMode(false);
+  }
 
   // ── Sidebar toggle ────────────────────────────────────────
   document.getElementById('sidebarToggle').addEventListener('click', () => {
