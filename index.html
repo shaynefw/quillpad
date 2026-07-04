@@ -71,10 +71,10 @@
       background: #4ade80; pointer-events: none;
       transition: background 0.2s;
     }
-    .backup-dot.fresh   { background: #4ade80; }   /* green: < 7d */
-    .backup-dot.aging   { background: #facc15; }   /* yellow: 7-14d */
-    .backup-dot.stale   { background: #fb923c; }   /* orange: 14-30d */
-    .backup-dot.danger  { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.7); } /* red: 30d+ or never */
+    .backup-dot.fresh   { background: #4ade80; }   /* green: < 24h */
+    .backup-dot.aging   { background: #facc15; }   /* yellow: 24-36h */
+    .backup-dot.stale   { background: #fb923c; }   /* orange: 36-48h */
+    .backup-dot.danger  { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.7); } /* red: 48h+ or never */
 
     /* Backup reminder banner */
     .backup-banner {
@@ -1089,7 +1089,7 @@
     dot.style.display = '';
     if (footerWrap) footerWrap.style.display = '';
 
-    let cls = 'fresh', label, footerText, days;
+    let cls = 'fresh', label, footerText, days, hours;
     if (!last) {
       cls = 'danger';
       label = 'Never backed up';
@@ -1097,7 +1097,7 @@
     } else {
       days = Math.floor((Date.now() - last) / 86400000);
       const minutes = Math.floor((Date.now() - last) / 60000);
-      const hours = Math.floor((Date.now() - last) / 3600000);
+      hours = Math.floor((Date.now() - last) / 3600000);
 
       let ago;
       if (minutes < 1)      ago = 'just now';
@@ -1107,9 +1107,9 @@
 
       footerText = `Last backup: ${ago}`;
 
-      if (days < 7)        { cls = 'fresh';  label = `Last backup: ${ago}`; }
-      else if (days < 14)  { cls = 'aging';  label = `Last backup: ${ago} — consider backing up`; }
-      else if (days < 30)  { cls = 'stale';  label = `Last backup: ${ago} — back up soon`; }
+      if (hours < 24)      { cls = 'fresh';  label = `Last backup: ${ago}`; }
+      else if (hours < 36) { cls = 'aging';  label = `Last backup: ${ago} — consider backing up`; }
+      else if (hours < 48) { cls = 'stale';  label = `Last backup: ${ago} — back up soon`; }
       else                 { cls = 'danger'; label = `Last backup: ${ago} — back up now`; }
     }
 
@@ -1128,7 +1128,8 @@
         bTitle.textContent = 'You haven\'t backed up yet';
         bSub.textContent = 'Notes only live in this browser. Clear cache = gone.';
       } else {
-        bTitle.textContent = `It's been ${days} days since your last backup`;
+        const since = days >= 2 ? `${days} days` : `${hours} hours`;
+        bTitle.textContent = `It's been ${since} since your last backup`;
         bSub.textContent = 'Click the download icon above to save a zip.';
       }
     } else {
