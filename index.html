@@ -123,7 +123,7 @@
       flex-shrink: 0; display: flex; align-items: center;
       color: var(--muted); margin-right: 3px; transition: transform 0.18s;
     }
-    .folder-wrap.open .chevron { transform: rotate(90deg); }
+    .folder-wrap.open > .folder-row .chevron { transform: rotate(90deg); }
 
     .folder-icon { flex-shrink: 0; margin-right: 5px; color: var(--accent); opacity: 0.75; }
     .folder-row.active-folder .folder-icon { opacity: 1; }
@@ -151,7 +151,7 @@
 
     /* Folder children */
     .folder-children { overflow: hidden; max-height: 0; transition: max-height 0.2s ease; }
-    .folder-wrap.open .folder-children { max-height: 2000px; }
+    .folder-wrap.open > .folder-children { max-height: 2000px; }
 
     /* Note item */
     .note-item {
@@ -492,21 +492,58 @@
       return;
     }
 
-    // Render folders
-    folders.forEach(folder => {
-      const folderNotes = notes
-        .filter(n => n.folderId === folder.id)
-        .sort((a, b) => b.updatedAt - a.updatedAt);
+    // Render top-level folders (each recurses into its subfolders)
+    childFolders(folders, null).forEach(folder => {
+      treeEl.appendChild(buildFolderWrap(folder, 0, folders, notes, activeId));
+    });
 
-      const wrap = document.createElement('div');
-      wrap.className = 'folder-wrap' + (folder.collapsed ? '' : ' open');
-      wrap.dataset.folderId = folder.id;
+    // Unfiled notes
+    const unfiled = notes
+      .filter(n => !n.folderId)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
 
-      // Folder row
-      const row = document.createElement('div');
-      row.className = 'folder-row' + (activeFolderId === folder.id ? ' active-folder' : '');
-      row.dataset.folderId = folder.id;
-      row.innerHTML = `
+    if (unfiled.length > 0) {
+      if (folders.length > 0) {
+        const lbl = document.createElement('div');
+        lbl.className = 'section-label';
+        lbl.textContent = 'Unfiled';
+        treeEl.appendChild(lbl);
+      }
+      unfiled.forEach(note => treeEl.appendChild(buildNoteItem(note, false, activeId)));
+    }
+  }
+
+  // Folders whose parent is parentId (null = top level)
+  const childFolders = (folders, parentId) =>
+    folders.filter(f => (f.parentId || null) === (parentId || null));
+
+  // All descendant folder ids of rootId (not including rootId)
+  function descendantFolderIds(folders, rootId) {
+    const out = [];
+    const stack = [rootId];
+    while (stack.length) {
+      const pid = stack.pop();
+      folders.forEach(f => { if ((f.parentId || null) === pid) { out.push(f.id); stack.push(f.id); } });
+    }
+    return out;
+  }
+
+  function buildFolderWrap(folder, depth, folders, notes, activeId) {
+    const folderNotes = notes
+      .filter(n => n.folderId === folder.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    const subFolders = childFolders(folders, folder.id);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'folder-wrap' + (folder.collapsed ? '' : ' open');
+    wrap.dataset.folderId = folder.id;
+
+    // Folder row
+    const row = document.createElement('div');
+    row.className = 'folder-row' + (activeFolderId === folder.id ? ' active-folder' : '');
+    row.dataset.folderId = folder.id;
+    row.style.paddingLeft = (6 + depth * 14) + 'px';
+    row.innerHTML = `
         <span class="chevron">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </span>
@@ -547,13 +584,24 @@
       // Right-click
       row.addEventListener('contextmenu', e => { e.preventDefault(); showFolderCtx(e, folder.id); });
 
-      // Drag-over for dropping notes
+      // Drag the folder itself (to nest it under another folder)
+      row.draggable = true;
+      row.addEventListener('dragstart', e => {
+        e.stopPropagation();
+        e.dataTransfer.setData('folderId', folder.id);
+        row.style.opacity = '0.5';
+      });
+      row.addEventListener('dragend', () => { row.style.opacity = ''; });
+
+      // Drag-over for dropping notes or folders
       row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drag-over'); });
       row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
       row.addEventListener('drop', e => {
-        e.preventDefault(); row.classList.remove('drag-over');
+        e.preventDefault(); e.stopPropagation(); row.classList.remove('drag-over');
         const noteId = e.dataTransfer.getData('noteId');
-        if (noteId) moveNoteToFolder(noteId, folder.id);
+        if (noteId) { moveNoteToFolder(noteId, folder.id); return; }
+        const dropFolderId = e.dataTransfer.getData('folderId');
+        if (dropFolderId) moveFolderToParent(dropFolderId, folder.id);
       });
 
       // Double-click name to rename
@@ -563,36 +611,22 @@
 
       wrap.appendChild(row);
 
-      // Children
+      // Children: subfolders first (recursive), then notes
       const children = document.createElement('div');
       children.className = 'folder-children';
-      folderNotes.forEach(note => children.appendChild(buildNoteItem(note, true, activeId)));
+      subFolders.forEach(sub => children.appendChild(buildFolderWrap(sub, depth + 1, folders, notes, activeId)));
+      folderNotes.forEach(note => children.appendChild(buildNoteItem(note, true, activeId, depth)));
       wrap.appendChild(children);
 
-      treeEl.appendChild(wrap);
-    });
-
-    // Unfiled notes
-    const unfiled = notes
-      .filter(n => !n.folderId)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-
-    if (unfiled.length > 0) {
-      if (folders.length > 0) {
-        const lbl = document.createElement('div');
-        lbl.className = 'section-label';
-        lbl.textContent = 'Unfiled';
-        treeEl.appendChild(lbl);
-      }
-      unfiled.forEach(note => treeEl.appendChild(buildNoteItem(note, false, activeId)));
-    }
+    return wrap;
   }
 
-  function buildNoteItem(note, indented, activeId) {
+  function buildNoteItem(note, indented, activeId, depth = 0) {
     const item = document.createElement('div');
     item.className = 'note-item' + (indented ? ' indented' : '') + (note.id === activeId ? ' active' : '');
     item.dataset.noteId = note.id;
     item.draggable = true;
+    if (indented && depth > 0) item.style.paddingLeft = (28 + depth * 14) + 'px';
 
     item.innerHTML = `
       <span class="note-file-icon">
@@ -672,12 +706,16 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           Remove from folder</div>`;
       }
-      folders.forEach(f => {
-        const active = note.folderId === f.id;
-        html += `<div class="ctx-item${active ? ' active' : ''}" data-action="move" data-note="${noteId}" data-folder="${f.id}">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          ${escHtml(f.name)}${active ? ' ✓' : ''}</div>`;
-      });
+      // Walk the folder tree depth-first so subfolders appear indented under their parent
+      (function walk(parentId, depth) {
+        childFolders(folders, parentId).forEach(f => {
+          const active = note.folderId === f.id;
+          html += `<div class="ctx-item${active ? ' active' : ''}" data-action="move" data-note="${noteId}" data-folder="${f.id}" style="padding-left:${10 + depth * 14}px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            ${escHtml(f.name)}${active ? ' ✓' : ''}</div>`;
+          walk(f.id, depth + 1);
+        });
+      })(null, 0);
       html += `<div class="ctx-separator"></div>`;
     }
 
@@ -693,6 +731,9 @@
       <div class="ctx-item" data-action="new-note-in" data-folder="${folderId}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New note here</div>
+      <div class="ctx-item" data-action="new-subfolder" data-folder="${folderId}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        New subfolder</div>
       <div class="ctx-item" data-action="rename-folder-ctx" data-id="${folderId}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         Rename</div>
@@ -723,6 +764,7 @@
         if (action === 'rename-folder-ctx') { closeCtxMenu(); const row = treeEl.querySelector(`.folder-row[data-folder-id="${item.dataset.id}"]`); if (row) startFolderRename(item.dataset.id, row); }
         if (action === 'delete-folder-ctx') deleteFolder(item.dataset.id);
         if (action === 'new-note-in')       newNoteInFolder(item.dataset.folder);
+        if (action === 'new-subfolder')     createFolder(item.dataset.folder);
         closeCtxMenu();
       });
     });
@@ -733,9 +775,14 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
 
   // ── Folder CRUD ───────────────────────────────────────────
-  document.getElementById('newFolderBtn').addEventListener('click', () => {
-    const folder = { id: uid(), name: 'New Folder', collapsed: false };
+  function createFolder(parentId) {
+    const folder = { id: uid(), name: parentId ? 'New Subfolder' : 'New Folder', collapsed: false, parentId: parentId || null };
     const folders = loadFolders();
+    // Make sure the parent is expanded so the new subfolder is visible
+    if (parentId) {
+      const pi = folders.findIndex(f => f.id === parentId);
+      if (pi !== -1) folders[pi].collapsed = false;
+    }
     folders.push(folder);
     saveFolders(folders);
     activeFolderId = folder.id;
@@ -746,19 +793,47 @@
                   [...treeEl.querySelectorAll('.folder-row')].find(r => r.dataset.folderId === folder.id);
       if (row) startFolderRename(folder.id, row);
     }, 50);
-  });
+  }
+
+  document.getElementById('newFolderBtn').addEventListener('click', () => createFolder(null));
 
   function deleteFolder(folderId) {
-    if (!confirm('Delete folder? Notes inside will be moved to Unfiled.')) return;
     const folders = loadFolders();
-    saveFolders(folders.filter(f => f.id !== folderId));
-    // Move notes to unfiled
+    const doomed = [folderId, ...descendantFolderIds(folders, folderId)];
+    const hasSub = doomed.length > 1;
+    if (!confirm(hasSub
+      ? 'Delete this folder and its subfolders? Notes inside will be moved to Unfiled.'
+      : 'Delete folder? Notes inside will be moved to Unfiled.')) return;
+    saveFolders(folders.filter(f => !doomed.includes(f.id)));
+    // Move notes from any deleted folder to unfiled
     const notes = loadNotes();
-    notes.forEach(n => { if (n.folderId === folderId) n.folderId = null; });
+    notes.forEach(n => { if (doomed.includes(n.folderId)) n.folderId = null; });
     saveNotes(notes);
-    if (activeFolderId === folderId) activeFolderId = null;
+    if (doomed.includes(activeFolderId)) activeFolderId = null;
     renderTree();
     showToast('Folder deleted, notes moved to Unfiled.');
+  }
+
+  function moveFolderToParent(folderId, parentId) {
+    if (folderId === parentId) return;
+    const folders = loadFolders();
+    // Prevent nesting a folder inside itself or one of its own descendants
+    if (parentId && descendantFolderIds(folders, folderId).includes(parentId)) {
+      showToast("Can't move a folder into its own subfolder.");
+      return;
+    }
+    const fi = folders.findIndex(f => f.id === folderId);
+    if (fi === -1) return;
+    if ((folders[fi].parentId || null) === (parentId || null)) return;
+    folders[fi].parentId = parentId || null;
+    // Open the destination so the moved folder is visible
+    if (parentId) {
+      const pi = folders.findIndex(f => f.id === parentId);
+      if (pi !== -1) folders[pi].collapsed = false;
+    }
+    saveFolders(folders);
+    renderTree();
+    showToast('Folder moved.');
   }
 
   function moveNoteToFolder(noteId, folderId) {
@@ -825,6 +900,10 @@
 
   editor.addEventListener('input',  () => { updateStats(); saveActive(); });
   titleEl.addEventListener('input', saveActive);
+  // Tab from the title jumps straight into the note body (skip toolbar buttons)
+  titleEl.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor.focus(); }
+  });
 
   function deleteNote(id) {
     let notes = loadNotes();
