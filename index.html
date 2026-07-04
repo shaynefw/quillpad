@@ -35,6 +35,31 @@
 
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
+    /* ── Purple cursor (fits the logo / themes) ── */
+    :root {
+      --cursor-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24'%3E%3Cpath d='M4 2 L4 20 L9 15.5 L12.3 21.5 L15.2 20.2 L11.9 14.4 L18.5 14.4 Z' fill='%237c6af7' stroke='%23ffffff' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E") 4 2, auto;
+      --cursor-hand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M9 10V4.5a1.5 1.5 0 0 1 3 0V10h0.6V6a1.5 1.5 0 0 1 3 0v4h0.6V8a1.4 1.4 0 0 1 2.8 0v7.5a5 5 0 0 1-5 5h-2.2a4.6 4.6 0 0 1-3.7-1.9l-2.9-4a1.5 1.5 0 0 1 2.3-1.9L8.9 13Z' fill='%237c6af7' stroke='%23ffffff' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") 8 3, pointer;
+    }
+    body { cursor: var(--cursor-arrow); }
+    a, button, select, label[for], summary,
+    .sb-btn, .dl-btn, .icon-btn, .row-btn, .bulk-btn, .ctx-item,
+    .note-item, .folder-row, .last-backup, .chevron, [onclick] {
+      cursor: var(--cursor-hand);
+    }
+    .editor, .title-input, input[type="text"], textarea { cursor: text; caret-color: var(--accent); }
+
+    /* ── Hover tooltip ── */
+    .tooltip {
+      position: fixed; z-index: 500; pointer-events: none;
+      background: var(--surface); color: var(--muted2);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 9px; font-size: 0.69rem; font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+      opacity: 0; transition: opacity 0.13s ease;
+      white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tooltip.show { opacity: 0.9; }
+
     /* ── Layout ── */
     .layout { display: flex; height: 100vh; overflow: hidden; }
 
@@ -297,6 +322,16 @@
       padding: 9px 20px 16px; border-top: 1px solid var(--border); gap: 12px; flex-wrap: wrap;
     }
     .stats { font-size: 0.72rem; color: var(--muted2); }
+    .footer-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .last-edit {
+      font-size: 0.72rem; color: var(--muted2);
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px; border-radius: 6px;
+    }
+    .last-edit-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0; opacity: 0.8;
+    }
     .last-backup {
       font-size: 0.72rem; color: var(--muted2);
       display: flex; align-items: center; gap: 6px;
@@ -470,10 +505,16 @@
     </div>
 
     <footer>
-      <div class="stats" id="stats">0 words · 0 chars</div>
-      <div class="last-backup" id="lastBackupText" title="Click to back up now">
-        <span class="last-backup-dot" id="lastBackupDot"></span>
-        <span id="lastBackupLabel">Never backed up</span>
+      <div class="footer-info">
+        <div class="stats" id="stats">0 words · 0 chars</div>
+        <div class="last-edit" id="lastEditText" title="When any note was last changed">
+          <span class="last-edit-dot"></span>
+          <span id="lastEditLabel">No edits yet</span>
+        </div>
+        <div class="last-backup" id="lastBackupText" title="Click to back up now">
+          <span class="last-backup-dot" id="lastBackupDot"></span>
+          <span id="lastBackupLabel">Never backed up</span>
+        </div>
       </div>
       <div class="download-group">
         <button class="dl-btn" onclick="downloadAs('txt')">
@@ -521,7 +562,10 @@
   // ── Storage ───────────────────────────────────────────────
   const loadNotes   = () => { try { return JSON.parse(localStorage.getItem('quillpad_notes'))   || []; } catch { return []; } };
   const loadFolders = () => { try { return JSON.parse(localStorage.getItem('quillpad_folders')) || []; } catch { return []; } };
-  const saveNotes   = n  => localStorage.setItem('quillpad_notes',   JSON.stringify(n));
+  const saveNotes   = (n, silent) => {
+    localStorage.setItem('quillpad_notes', JSON.stringify(n));
+    if (!silent) { localStorage.setItem('quillpad_lastEdit', Date.now().toString()); updateLastEdit(); }
+  };
   const saveFolders = f  => localStorage.setItem('quillpad_folders', JSON.stringify(f));
   const getActiveId = () => localStorage.getItem('quillpad_activeId');
   const setActiveId = id => localStorage.setItem('quillpad_activeId', id);
@@ -1402,6 +1446,28 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
   }
 
+  function relativeTime(ts) {
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    const hrs  = Math.floor((Date.now() - ts) / 3600000);
+    const days = Math.floor((Date.now() - ts) / 86400000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return `${mins} min${mins !== 1 ? 's' : ''} ago`;
+    if (hrs < 24)  return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  }
+
+  // ── Last-edit indicator (global — any note change) ─────────
+  function updateLastEdit() {
+    const wrap  = document.getElementById('lastEditText');
+    const label = document.getElementById('lastEditLabel');
+    if (!wrap || !label) return;
+    const last = parseInt(localStorage.getItem('quillpad_lastEdit') || '0', 10);
+    if (!last) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    label.textContent = `Last edit: ${relativeTime(last)}`;
+    wrap.title = `Last edit: ${new Date(last).toLocaleString()}`;
+  }
+
   // ── Boot ──────────────────────────────────────────────────
   function boot() {
     // Migrate legacy
@@ -1410,14 +1476,14 @@
     let notes = loadNotes();
     if (!notes.length) {
       const note = { id: uid(), title: legacyTitle || '', content: legacyContent || '', folderId: null, updatedAt: Date.now() };
-      notes = [note]; saveNotes(notes);
+      notes = [note]; saveNotes(notes, true);
       localStorage.removeItem('quillpad_content');
       localStorage.removeItem('quillpad_title');
     }
     // Ensure folderId field on older notes
     let dirty = false;
     notes.forEach(n => { if (!('folderId' in n)) { n.folderId = null; dirty = true; } });
-    if (dirty) saveNotes(notes);
+    if (dirty) saveNotes(notes, true);
 
     let activeId = getActiveId();
     if (!activeId || !notes.find(n => n.id === activeId)) {
@@ -1434,8 +1500,54 @@
     renderTree();
     switchNote(activeId);
     updateBackupStatus();
-    // Re-check status every minute so the "X mins ago" counter stays accurate
-    setInterval(updateBackupStatus, 60 * 1000);
+    updateLastEdit();
+    initTooltips();
+    // Re-check status every minute so the "X mins ago" counters stay accurate
+    setInterval(() => { updateBackupStatus(); updateLastEdit(); }, 60 * 1000);
+  }
+
+  // ── Faint hover tooltips (styled, reads each element's title) ──
+  function initTooltips() {
+    const tip = document.createElement('div');
+    tip.className = 'tooltip';
+    document.body.appendChild(tip);
+    let active = null;
+
+    function place(el) {
+      const r = el.getBoundingClientRect();
+      tip.style.visibility = 'hidden'; tip.classList.add('show');
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let top = r.bottom + 8;
+      if (top + th > window.innerHeight - 4) top = r.top - th - 8;
+      let left = r.left + r.width / 2 - tw / 2;
+      left = Math.max(6, Math.min(left, window.innerWidth - tw - 6));
+      tip.style.left = left + 'px'; tip.style.top = top + 'px';
+      tip.style.visibility = '';
+    }
+    function show(el) {
+      const text = el.getAttribute('title');
+      if (!text) return;
+      active = el;
+      el.setAttribute('data-tip', text);
+      el.removeAttribute('title');       // suppress the native tooltip
+      tip.textContent = text;
+      place(el);
+    }
+    function hide(el) {
+      if (el.hasAttribute('data-tip')) { el.setAttribute('title', el.getAttribute('data-tip')); el.removeAttribute('data-tip'); }
+      if (active === el) active = null;
+      tip.classList.remove('show');
+    }
+    document.addEventListener('mouseover', e => {
+      const el = e.target.closest('[title]');
+      if (el && el !== active) show(el);
+    });
+    document.addEventListener('mouseout', e => {
+      const el = e.target.closest('[data-tip]');
+      if (el && (!e.relatedTarget || !el.contains(e.relatedTarget))) hide(el);
+    });
+    // Never leave a tooltip stranded after a click
+    document.addEventListener('click', () => { if (active) hide(active); }, true);
   }
 
   boot();
