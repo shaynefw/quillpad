@@ -385,6 +385,42 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+    /* ── Confirmation modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(10, 8, 20, 0.55); backdrop-filter: blur(3px);
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 22px 22px 18px; width: 340px; max-width: 100%;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+      text-align: center;
+      transform: scale(0.94); opacity: 0;
+      transition: transform 0.16s ease, opacity 0.16s ease;
+    }
+    .modal-overlay.show .modal { transform: scale(1); opacity: 1; }
+    .modal-icon {
+      width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(224,92,92,0.12); color: #e05c5c;
+    }
+    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .modal-message { font-size: 0.82rem; color: var(--muted2); line-height: 1.45; margin-bottom: 18px; }
+    .modal-actions { display: flex; gap: 8px; }
+    .modal-btn {
+      flex: 1; padding: 9px 12px; border-radius: 9px;
+      font-size: 0.82rem; font-weight: 600; border: 1px solid var(--border);
+      background: var(--btn-bg); color: var(--text);
+      transition: background 0.14s, border-color 0.14s, transform 0.1s;
+    }
+    .modal-btn:hover { background: var(--btn-hover); }
+    .modal-btn:active { transform: translateY(1px); }
+    .modal-btn.danger { background: #e05c5c; border-color: #e05c5c; color: #fff; }
+    .modal-btn.danger:hover { background: #d24b4b; border-color: #d24b4b; }
+
     /* ── Drag-over highlight ── */
     .folder-row.drag-over { background: var(--folder-active) !important; outline: 1.5px dashed var(--accent); }
     .note-item { user-select: none; }
@@ -556,6 +592,21 @@
 <!-- Context menu -->
 <div class="ctx-menu" id="ctxMenu"></div>
 <div class="toast" id="toast"></div>
+
+<!-- Confirmation modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-icon" id="modalIcon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    </div>
+    <h3 class="modal-title" id="modalTitle">Delete this note?</h3>
+    <p class="modal-message" id="modalMessage">This can't be undone.</p>
+    <div class="modal-actions">
+      <button class="modal-btn" id="modalCancel">Cancel</button>
+      <button class="modal-btn danger" id="modalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
 
 <script>
   // ── DOM refs ─────────────────────────────────────────────
@@ -914,13 +965,18 @@
 
   document.getElementById('newFolderBtn').addEventListener('click', () => createFolder(null));
 
-  function deleteFolder(folderId) {
+  async function deleteFolder(folderId) {
     const folders = loadFolders();
     const doomed = [folderId, ...descendantFolderIds(folders, folderId)];
     const hasSub = doomed.length > 1;
-    if (!confirm(hasSub
-      ? 'Delete this folder and its subfolders? Notes inside will be moved to Unfiled.'
-      : 'Delete folder? Notes inside will be moved to Unfiled.')) return;
+    const ok = await confirmDialog({
+      title: hasSub ? 'Delete folder and subfolders?' : 'Delete this folder?',
+      message: hasSub
+        ? 'This folder and its subfolders will be removed. Notes inside will be moved to Unfiled.'
+        : 'The folder will be removed. Notes inside will be moved to Unfiled.',
+      confirmText: 'Delete'
+    });
+    if (!ok) return;
     saveFolders(folders.filter(f => !doomed.includes(f.id)));
     // Move notes from any deleted folder to unfiled
     const notes = loadNotes();
@@ -1022,11 +1078,16 @@
     if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor.focus(); }
   });
 
-  function confirmDeleteNote(id) {
+  async function confirmDeleteNote(id) {
     const note = loadNotes().find(n => n.id === id);
     if (!note) return;
     const label = (note.title || '').trim();
-    if (!confirm(label ? `Delete "${label}"? This can't be undone.` : "Delete this note? This can't be undone.")) return;
+    const ok = await confirmDialog({
+      title: label ? `Delete "${label}"?` : 'Delete this note?',
+      message: "This can't be undone.",
+      confirmText: 'Delete'
+    });
+    if (!ok) return;
     deleteNote(id);
   }
 
@@ -1044,10 +1105,18 @@
     showToast('Note deleted.');
   }
 
-  document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('clearBtn').addEventListener('click', async () => {
     const id = getActiveId(); if (!id) return;
     const note = loadNotes().find(n => n.id === id);
-    if ((note?.title || note?.content) && !confirm('Delete this note?')) return;
+    if (note?.title || note?.content) {
+      const label = (note.title || '').trim();
+      const ok = await confirmDialog({
+        title: label ? `Delete "${label}"?` : 'Delete this note?',
+        message: "This can't be undone.",
+        confirmText: 'Delete'
+      });
+      if (!ok) return;
+    }
     deleteNote(id);
   });
 
@@ -1089,10 +1158,15 @@
     updateBulkBar();
   });
 
-  document.getElementById('bulkDelete').addEventListener('click', () => {
+  document.getElementById('bulkDelete').addEventListener('click', async () => {
     const ids = [...selectedNotes];
     if (!ids.length) return;
-    if (!confirm(`Delete ${ids.length} note${ids.length !== 1 ? 's' : ''}? This can't be undone.`)) return;
+    const ok = await confirmDialog({
+      title: `Delete ${ids.length} note${ids.length !== 1 ? 's' : ''}?`,
+      message: "This can't be undone.",
+      confirmText: `Delete ${ids.length}`
+    });
+    if (!ok) return;
     let notes = loadNotes().filter(n => !selectedNotes.has(n.id));
     if (notes.length === 0) {
       const fresh = { id: uid(), title: '', content: '', folderId: null, updatedAt: Date.now() };
@@ -1463,6 +1537,40 @@
   function showToast(msg) {
     toastEl.textContent = msg; toastEl.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  }
+
+  // ── In-page confirmation modal (replaces window.confirm) ──
+  function confirmDialog({ title = 'Are you sure?', message = '', confirmText = 'Delete' } = {}) {
+    const overlay = document.getElementById('modalOverlay');
+    const confirmBtn = document.getElementById('modalConfirm');
+    const cancelBtn = document.getElementById('modalCancel');
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalMessage').textContent = message;
+    confirmBtn.textContent = confirmText;
+
+    return new Promise(resolve => {
+      const close = (result) => {
+        overlay.classList.remove('show');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        overlay.removeEventListener('mousedown', onBackdrop);
+        document.removeEventListener('keydown', onKey);
+        resolve(result);
+      };
+      const onConfirm = () => close(true);
+      const onCancel  = () => close(false);
+      const onBackdrop = e => { if (e.target === overlay) close(false); };
+      const onKey = e => {
+        if (e.key === 'Escape') close(false);
+        if (e.key === 'Enter')  close(true);
+      };
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      overlay.addEventListener('mousedown', onBackdrop);
+      document.addEventListener('keydown', onKey);
+      overlay.classList.add('show');
+      confirmBtn.focus();
+    });
   }
 
   function relativeTime(ts) {
