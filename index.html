@@ -539,8 +539,16 @@
       <div class="toolbar-divider"></div>
       <button class="toolbar-btn" title="Bold (⌘B)" onclick="wrapSelection('**','**')"><b>B</b></button>
       <button class="toolbar-btn" title="Italic (⌘I)" onclick="wrapSelection('_','_')"><i>I</i></button>
-      <button class="toolbar-btn" title="Code" onclick="wrapSelection('`','`')">
+      <button class="toolbar-btn" title="Underline (⌘U)" onclick="wrapSelection('&lt;u&gt;','&lt;/u&gt;')"><u>U</u></button>
+      <button class="toolbar-btn" title="Strikethrough (⌘⇧X)" onclick="wrapSelection('~~','~~')"><s>S</s></button>
+      <button class="toolbar-btn" title="Highlight (⌘⇧H)" onclick="wrapSelection('==','==')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-4 4v3h3l4-4"/><path d="M13 7l4 4"/><path d="M15 5l4 4-8 8-4-4z"/></svg>
+      </button>
+      <button class="toolbar-btn" title="Code (⌘E)" onclick="wrapSelection('`','`')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </button>
+      <button class="toolbar-btn" title="Link (⌘K)" onclick="insertLink()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       </button>
       <div class="toolbar-divider"></div>
       <button class="toolbar-btn" onclick="insertPrefix('# ')">H1</button>
@@ -1266,10 +1274,24 @@
     editor.setRangeText(prefix, editor.value.lastIndexOf('\n', s - 1) + 1, editor.value.lastIndexOf('\n', s - 1) + 1, 'end');
     editor.focus(); saveActive();
   }
+  function insertLink() {
+    const s = editor.selectionStart, e2 = editor.selectionEnd;
+    const sel = editor.value.slice(s, e2) || 'text';
+    const md = `[${sel}](url)`;
+    editor.setRangeText(md, s, e2, 'end');
+    const urlStart = s + md.length - 4; // position of "url"
+    editor.setSelectionRange(urlStart, urlStart + 3); // select the "url" placeholder
+    editor.focus(); saveActive();
+  }
   editor.addEventListener('keydown', e => {
     const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.shiftKey && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); wrapSelection('~~', '~~'); return; }
+    if (mod && e.shiftKey && (e.key === 'h' || e.key === 'H')) { e.preventDefault(); wrapSelection('==', '=='); return; }
     if (mod && e.key === 'b') { e.preventDefault(); wrapSelection('**', '**'); }
     if (mod && e.key === 'i') { e.preventDefault(); wrapSelection('_', '_'); }
+    if (mod && e.key === 'u') { e.preventDefault(); wrapSelection('<u>', '</u>'); }
+    if (mod && e.key === 'e') { e.preventDefault(); wrapSelection('`', '`'); }
+    if (mod && e.key === 'k') { e.preventDefault(); insertLink(); }
     if (e.key === 'Tab') { e.preventDefault(); editor.setRangeText('  ', editor.selectionStart, editor.selectionStart, 'end'); saveActive(); }
   });
 
