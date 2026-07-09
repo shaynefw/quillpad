@@ -318,6 +318,8 @@
       transition: color 0.15s, background 0.15s; display: flex; align-items: center; gap: 4px;
     }
     .toolbar-btn:hover { color: var(--text); background: var(--btn-hover); }
+    .toolbar-btn:disabled { opacity: 0.35; cursor: default; }
+    .toolbar-btn:disabled:hover { color: var(--muted2); background: none; }
     .toolbar-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
     select.font-select {
       background: none; border: none; color: var(--muted2); font-size: 0.8rem;
@@ -576,6 +578,10 @@
     </header>
 
     <div class="toolbar">
+      <button class="toolbar-btn" id="undoBtn" title="Undo (⌘Z)" onclick="undo()" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+      </button>
+      <div class="toolbar-divider"></div>
       <select class="font-select" id="fontSelect">
         <option value="sans">Sans-serif</option>
         <option value="serif">Serif</option>
@@ -1107,6 +1113,7 @@
     titleEl.value  = note.title;
     editor.value   = note.content;
     activeFolderId = note.folderId || null;
+    undoStack = []; lastTypeSnap = 0; refreshUndoBtn();  // history is per-note
     updateStats();
     updatePreview();
     renderTree();
@@ -1313,18 +1320,56 @@
       : `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
   }
 
+  // ── Undo history ──────────────────────────────────────────
+  let undoStack = [];
+  let lastTypeSnap = 0;
+  function recordUndo() {
+    const v = editor.value;
+    if (undoStack.length && undoStack[undoStack.length - 1] === v) return;
+    undoStack.push(v);
+    if (undoStack.length > 200) undoStack.shift();
+    refreshUndoBtn();
+  }
+  function refreshUndoBtn() {
+    document.getElementById('undoBtn').disabled = undoStack.length === 0;
+  }
+  function undo() {
+    if (!undoStack.length) return;
+    let prev = undoStack.pop();
+    if (prev === editor.value && undoStack.length) prev = undoStack.pop(); // skip a no-op snapshot
+    editor.value = prev;
+    saveActive(); updateStats(); updatePreview(); refreshUndoBtn();
+    editor.focus();
+  }
+  // Snapshot before the user types (grouped by ~500ms pauses) so typing is undoable
+  editor.addEventListener('beforeinput', () => {
+    const now = performance.now();
+    if (now - lastTypeSnap > 500) { recordUndo(); lastTypeSnap = now; }
+  });
+
   // ── Markdown helpers ──────────────────────────────────────
   function wrapSelection(before, after) {
+    recordUndo();
     const s = editor.selectionStart, e2 = editor.selectionEnd;
     editor.setRangeText(before + editor.value.slice(s, e2) + after, s, e2, 'select');
     editor.focus(); saveActive();
   }
   function insertPrefix(prefix) {
-    const s = editor.selectionStart;
-    editor.setRangeText(prefix, editor.value.lastIndexOf('\n', s - 1) + 1, editor.value.lastIndexOf('\n', s - 1) + 1, 'end');
+    recordUndo();
+    const val = editor.value;
+    const s = editor.selectionStart, e2 = editor.selectionEnd;
+    const blockStart = val.lastIndexOf('\n', s - 1) + 1;
+    // If the selection ends right at a line start, don't pull in the next (empty) line
+    const endRef = (e2 > s && val[e2 - 1] === '\n') ? e2 - 1 : e2;
+    let blockEnd = val.indexOf('\n', endRef);
+    if (blockEnd === -1) blockEnd = val.length;
+    const prefixed = val.slice(blockStart, blockEnd).split('\n').map(l => prefix + l).join('\n');
+    editor.setRangeText(prefixed, blockStart, blockEnd, 'end');
+    editor.setSelectionRange(blockStart, blockStart + prefixed.length);
     editor.focus(); saveActive();
   }
   function insertLink() {
+    recordUndo();
     const s = editor.selectionStart, e2 = editor.selectionEnd;
     const sel = editor.value.slice(s, e2) || 'text';
     const md = `[${sel}](url)`;
@@ -1402,6 +1447,7 @@
 
   editor.addEventListener('keydown', e => {
     const mod = e.metaKey || e.ctrlKey;
+    if (mod && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); return; }
     if (mod && e.shiftKey && (e.key === 'x' || e.key === 'X')) { e.preventDefault(); wrapSelection('~~', '~~'); return; }
     if (mod && e.shiftKey && (e.key === 'h' || e.key === 'H')) { e.preventDefault(); wrapSelection('==', '=='); return; }
     if (mod && e.key === 'b') { e.preventDefault(); wrapSelection('**', '**'); }
