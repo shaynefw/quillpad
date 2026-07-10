@@ -1351,7 +1351,12 @@
   function wrapSelection(before, after) {
     recordUndo();
     const s = editor.selectionStart, e2 = editor.selectionEnd;
-    editor.setRangeText(before + editor.value.slice(s, e2) + after, s, e2, 'select');
+    const sel = editor.value.slice(s, e2);
+    // Inline marks can't span line breaks — wrap each non-empty line on its own
+    const wrapped = sel.includes('\n')
+      ? sel.split('\n').map(l => l.trim() === '' ? l : before + l + after).join('\n')
+      : before + sel + after;
+    editor.setRangeText(wrapped, s, e2, 'select');
     editor.focus(); saveActive();
   }
   function insertPrefix(prefix) {
