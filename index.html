@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#131020" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#e8e3fa" media="(prefers-color-scheme: light)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c6af7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20h9'/><path d='M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z'/></svg>">
   <title>Quillpad</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -27,6 +30,7 @@
       --item-active: #2a2340;
       --folder-active: #241f38;
       --code-font: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+      --code-size: 0.85rem;
     }
     [data-theme="light"] {
       --bg: #e8e3fa; --surface: #f6f3ff; --sidebar: #ded7f4; --border: #cfc6ec;
@@ -64,7 +68,7 @@
     .tooltip.show { opacity: 0.9; }
 
     /* ── Layout ── */
-    .layout { display: flex; height: 100vh; overflow: hidden; }
+    .layout { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
     /* ── Sidebar ── */
     .sidebar {
@@ -352,7 +356,7 @@
       display: block; flex-shrink: 0; overflow: hidden;
       width: 46px; padding-right: 10px; margin-right: 10px;
       border-right: 1px solid var(--border);
-      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      font-family: var(--code-font); font-size: var(--code-size); line-height: 1.6;
       color: var(--muted); text-align: right; white-space: pre;
       user-select: none; cursor: default;
     }
@@ -362,11 +366,11 @@
     }
     body.code-mode .hl-layer code {
       display: block; padding: 0; background: none;
-      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      font-family: var(--code-font); font-size: var(--code-size); line-height: 1.6;
       white-space: pre; color: var(--text);
     }
     body.code-mode #editor {
-      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      font-family: var(--code-font); font-size: var(--code-size); line-height: 1.6;
       white-space: pre; overflow: auto;
       color: transparent; -webkit-text-fill-color: transparent;
       caret-color: var(--accent); caret-shape: block;   /* terminal-style block caret */
@@ -532,18 +536,89 @@
     .folder-row.drag-over { background: var(--folder-active) !important; outline: 1.5px dashed var(--accent); }
     .note-item { user-select: none; }
 
-    @media (max-width: 600px) {
-      .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 50; transform: translateX(0); width: 240px; min-width: 240px; }
-      .sidebar.collapsed { transform: translateX(-100%); width: 240px; min-width: 240px; }
-      .dl-btn span { display: none; }
-      /* Too narrow to split — stack the preview under the editor */
+    /* ── Mobile / small screens ── */
+    .sidebar-backdrop { display: none; }
+
+    @media (max-width: 700px) {
+      :root { --code-size: 16px; }   /* 16px stops iOS zooming in on focus */
+
+      /* Sidebar becomes a slide-over with a tap-to-close backdrop */
+      .sidebar {
+        position: fixed; top: 0; left: 0; z-index: 50;
+        height: 100dvh; width: min(84vw, 300px); min-width: 0;
+        transform: translateX(0); transition: transform 0.22s ease;
+        padding-left: env(safe-area-inset-left);
+      }
+      .sidebar.collapsed { transform: translateX(-102%); width: min(84vw, 300px); min-width: 0; }
+      .sidebar-backdrop {
+        display: block; position: fixed; inset: 0; z-index: 40;
+        background: rgba(8, 6, 16, 0.5); backdrop-filter: blur(2px);
+        opacity: 0; pointer-events: none; transition: opacity 0.22s ease;
+      }
+      .sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
+
+      /* Roomier tap targets */
+      .sb-btn, .icon-btn, .sidebar-toggle { padding: 9px; }
+      .row-btn { padding: 6px; }
+      .note-item, .folder-row { padding-top: 9px; padding-bottom: 9px; }
+      .note-item-actions, .folder-row-actions { opacity: 1; }  /* no hover on touch */
+
+      header { padding: 10px 12px; gap: 4px; padding-top: max(10px, env(safe-area-inset-top)); }
+      .title-input { font-size: 1rem; }
+      .header-actions { gap: 0; }
+
+      /* One scrollable row instead of wrapping into several */
+      .toolbar {
+        flex-wrap: nowrap; overflow-x: auto; padding: 6px 12px;
+        scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      }
+      .toolbar::-webkit-scrollbar { display: none; }
+      .toolbar-btn, .font-select { flex-shrink: 0; }
+
+      .editor-wrap { padding: 14px 12px 0; }
+
+      /* Too narrow to split side-by-side — stack, each half scrolls */
       .editor-wrap.split { flex-direction: column; }
-      .editor-wrap.split .preview-pane { margin-left: 0; padding-left: 0; border-left: none; border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+      .editor-wrap.split .edit-pane { flex: 1 1 50%; min-height: 0; }
+      .editor-wrap.split .preview-pane,
+      body.code-mode .editor-wrap.split .code-output {
+        flex: 1 1 50%; min-height: 0; height: auto;
+        margin-left: 0; padding-left: 0; margin-top: 12px; padding-top: 12px;
+        border-left: none; border-top: 1px solid var(--border);
+      }
+
+      /* Footer: icon-only downloads, single tidy row */
+      footer {
+        padding: 8px 12px; gap: 8px;
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+      }
+      .dl-btn span { display: none; }
+      .dl-btn { padding: 8px 10px; }
+      .footer-info { gap: 2px; flex: 1; min-width: 0; }
+      .stats, .last-edit, .last-backup { font-size: 0.66rem; padding: 3px 5px; }
+      .download-group { gap: 6px; }
+
+      .modal { width: 100%; }
+      .toast { bottom: max(18px, env(safe-area-inset-bottom)); max-width: 90vw; white-space: normal; text-align: center; }
+    }
+
+    /* Very small phones (iPhone SE ~375px) — drop the least essential text */
+    @media (max-width: 400px) {
+      .last-edit { display: none; }
+      .editor-wrap { padding: 12px 10px 0; }
+      header { padding-left: 8px; padding-right: 8px; }
+    }
+
+    /* Touch devices: hover tooltips don't apply */
+    @media (hover: none) {
+      .tooltip { display: none !important; }
     }
   </style>
 </head>
 <body>
 <div class="layout">
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
@@ -1223,7 +1298,7 @@
     applyMode(note.mode === 'code' ? 'code' : 'notes', note.lang);  // mode is per-note
     renderTree();
     editor.focus();
-    if (window.innerWidth <= 600) sidebar.classList.add('collapsed');
+    if (isMobile()) setSidebar(false);   // picking a note closes the slide-over
   }
 
   function saveActive() {
@@ -1395,8 +1470,20 @@
   }
 
   // ── Sidebar toggle ────────────────────────────────────────
+  const isMobile = () => window.matchMedia('(max-width: 700px)').matches;
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+  function setSidebar(open) {
+    sidebar.classList.toggle('collapsed', !open);
+    sidebarBackdrop.classList.toggle('show', open && isMobile());
+  }
   document.getElementById('sidebarToggle').addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
+    setSidebar(sidebar.classList.contains('collapsed'));
+  });
+  sidebarBackdrop.addEventListener('click', () => setSidebar(false));
+  // Keep the backdrop honest if the window is resized across the breakpoint
+  window.addEventListener('resize', () => {
+    if (!isMobile()) sidebarBackdrop.classList.remove('show');
   });
 
   // ── Stats ─────────────────────────────────────────────────
@@ -2217,14 +2304,18 @@
     document.getElementById('fontSelect').value = font;
     editor.style.fontFamily = FONTS[font];
 
-    // Live preview: on by default, remembers the user's choice
-    setPreview(localStorage.getItem('quillpad_preview') !== '0');
+    // Live preview: remembers the user's choice; defaults off on phones (too narrow to split)
+    const prevPref = localStorage.getItem('quillpad_preview');
+    setPreview(prevPref === null ? !isMobile() : prevPref !== '0');
+
+    // The sidebar is a slide-over on phones — start closed so the editor is visible
+    if (isMobile()) setSidebar(false);
 
     renderTree();
     switchNote(activeId);
     updateBackupStatus();
     updateLastEdit();
-    initTooltips();
+    if (window.matchMedia('(hover: hover)').matches) initTooltips();  // no hover on touch
     // Re-check status every minute so the "X mins ago" counters stay accurate
     setInterval(() => { updateBackupStatus(); updateLastEdit(); }, 60 * 1000);
   }
