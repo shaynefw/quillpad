@@ -49,7 +49,7 @@
     .note-item, .folder-row, .last-backup, .chevron, [onclick] {
       cursor: var(--cursor-hand) !important;
     }
-    .editor, .title-input, input[type="text"], textarea { cursor: var(--cursor-text) !important; caret-color: var(--accent); caret-shape: block; }
+    .editor, .title-input, input[type="text"], textarea { cursor: var(--cursor-text) !important; caret-color: var(--accent); }
 
     /* ── Hover tooltip ── */
     .tooltip {
@@ -369,7 +369,7 @@
       font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
       white-space: pre; overflow: auto;
       color: transparent; -webkit-text-fill-color: transparent;
-      caret-color: var(--accent);
+      caret-color: var(--accent); caret-shape: block;   /* terminal-style block caret */
     }
     /* Syntax colors (theme-aware) */
     .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section { color: #c792ea; }
