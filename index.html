@@ -7,6 +7,7 @@
   <title>Quillpad</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,6 +26,7 @@
       --item-hover: #221d33;
       --item-active: #2a2340;
       --folder-active: #241f38;
+      --code-font: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
     }
     [data-theme="light"] {
       --bg: #e8e3fa; --surface: #f6f3ff; --sidebar: #ded7f4; --border: #cfc6ec;
@@ -329,12 +331,70 @@
     select.font-select:hover { color: var(--text); background: var(--btn-hover); }
 
     .editor-wrap { flex: 1; overflow: hidden; padding: 20px 20px 0; display: flex; gap: 0; }
+    .edit-pane { flex: 1; display: flex; min-width: 0; height: 100%; }
+    .edit-area { position: relative; flex: 1; min-width: 0; height: 100%; }
     #editor {
-      flex: 1; height: 100%; background: transparent; border: none;
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      background: transparent; border: none;
       outline: none; resize: none; color: var(--text); font-size: 1rem;
-      line-height: 1.75; padding: 0; caret-color: var(--accent); min-width: 0;
+      line-height: 1.75; padding: 0; caret-color: var(--accent);
     }
     #editor::placeholder { color: var(--muted); }
+    .gutter, .hl-layer { display: none; }
+
+    /* ── Code editor mode ── */
+    .md-only { display: contents; }
+    body.code-mode .md-only { display: none; }
+    .code-only { display: none; }
+    body.code-mode .code-only { display: contents; }
+
+    body.code-mode .gutter {
+      display: block; flex-shrink: 0; overflow: hidden;
+      width: 46px; padding-right: 10px; margin-right: 10px;
+      border-right: 1px solid var(--border);
+      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      color: var(--muted); text-align: right; white-space: pre;
+      user-select: none; cursor: default;
+    }
+    body.code-mode .hl-layer {
+      display: block; position: absolute; inset: 0; margin: 0;
+      overflow: hidden; pointer-events: none; background: none;
+    }
+    body.code-mode .hl-layer code {
+      display: block; padding: 0; background: none;
+      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      white-space: pre; color: var(--text);
+    }
+    body.code-mode #editor {
+      font-family: var(--code-font); font-size: 0.85rem; line-height: 1.6;
+      white-space: pre; overflow: auto;
+      color: transparent; -webkit-text-fill-color: transparent;
+      caret-color: var(--accent);
+    }
+    /* Syntax colors (theme-aware) */
+    .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section { color: #c792ea; }
+    .hljs-string, .hljs-attr, .hljs-regexp, .hljs-addition { color: #7fd88f; }
+    .hljs-number, .hljs-symbol, .hljs-bullet { color: #f78c6c; }
+    .hljs-comment, .hljs-quote { color: var(--muted2); font-style: italic; }
+    .hljs-title, .hljs-name, .hljs-selector-id, .hljs-selector-class { color: #82aaff; }
+    .hljs-built_in, .hljs-type, .hljs-meta { color: #ffcb6b; }
+    .hljs-variable, .hljs-template-variable, .hljs-tag { color: #f07178; }
+    [data-theme="light"] .hljs-keyword, [data-theme="light"] .hljs-selector-tag,
+    [data-theme="light"] .hljs-literal, [data-theme="light"] .hljs-section { color: #7c3aed; }
+    [data-theme="light"] .hljs-string, [data-theme="light"] .hljs-attr { color: #197a3d; }
+    [data-theme="light"] .hljs-number { color: #b4531a; }
+    [data-theme="light"] .hljs-title, [data-theme="light"] .hljs-name { color: #1e5fbf; }
+    [data-theme="light"] .hljs-built_in, [data-theme="light"] .hljs-type { color: #92620a; }
+    [data-theme="light"] .hljs-variable, [data-theme="light"] .hljs-tag { color: #c0392b; }
+
+    /* Live code output */
+    .code-output { display: none; border: none; }
+    body.code-mode .preview-pane { display: none !important; }
+    body.code-mode .editor-wrap.split .code-output {
+      display: block; flex: 1; min-width: 0; height: 100%;
+      margin-left: 24px; border-left: 1px solid var(--border);
+      background: #fff;
+    }
 
     /* Live preview pane */
     .preview-pane {
@@ -555,6 +615,11 @@
       </button>
       <input class="title-input" id="noteTitle" type="text" placeholder="Untitled note…" maxlength="80" />
       <div class="header-actions">
+        <button class="icon-btn" id="modeToggle" title="Switch to code editor">
+          <svg id="modeIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+          </svg>
+        </button>
         <button class="icon-btn" id="previewToggle" title="Toggle live preview">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/>
@@ -582,6 +647,20 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
       </button>
       <div class="toolbar-divider"></div>
+      <span class="code-only" id="codeTools">
+        <select class="font-select" id="langSelect" title="Language for syntax highlighting">
+          <option value="auto">Auto-detect</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="javascript">JavaScript</option>
+          <option value="json">JSON</option>
+          <option value="python">Python</option>
+          <option value="bash">Bash</option>
+          <option value="sql">SQL</option>
+          <option value="xml">XML</option>
+        </select>
+      </span>
+      <span class="md-only">
       <select class="font-select" id="fontSelect">
         <option value="sans">Sans-serif</option>
         <option value="serif">Serif</option>
@@ -612,11 +691,19 @@
       </button>
       <button class="toolbar-btn" onclick="insertPrefix('> ')">Quote</button>
       <button class="toolbar-btn" onclick="insertPrefix('- [ ] ')">Task</button>
+      </span>
     </div>
 
     <div class="editor-wrap" id="editorWrap">
-      <textarea id="editor" placeholder="Start writing…" spellcheck="true" autofocus></textarea>
+      <div class="edit-pane" id="editPane">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="edit-area" id="editArea">
+          <pre class="hl-layer" id="hlLayer" aria-hidden="true"><code id="hlCode"></code></pre>
+          <textarea id="editor" placeholder="Start writing…" spellcheck="true" autofocus></textarea>
+        </div>
+      </div>
       <div class="preview-pane" id="previewPane" aria-hidden="true"></div>
+      <iframe class="code-output" id="codeOutput" sandbox="allow-scripts" title="Live output"></iframe>
     </div>
 
     <footer>
@@ -679,6 +766,11 @@
   const ctxMenu  = document.getElementById('ctxMenu');
   const editorWrap  = document.getElementById('editorWrap');
   const previewPane = document.getElementById('previewPane');
+  const gutter      = document.getElementById('gutter');
+  const hlLayer     = document.getElementById('hlLayer');
+  const hlCode      = document.getElementById('hlCode');
+  const codeOutput  = document.getElementById('codeOutput');
+  const langSelect  = document.getElementById('langSelect');
 
   const FONTS = {
     sans:  '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -852,13 +944,14 @@
     item.draggable = !selectMode;
     if (indented && depth > 0) item.style.paddingLeft = (28 + depth * 14) + 'px';
 
+    const fileGlyph = note.mode === 'code'
+      ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`
+      : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
     const checkbox = selectMode ? `
       <span class="note-check">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </span>` : `
-      <span class="note-file-icon">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      </span>`;
+      <span class="note-file-icon">${fileGlyph}</span>`;
 
     item.innerHTML = `${checkbox}
       <div class="note-item-body">
@@ -1114,8 +1207,7 @@
     editor.value   = note.content;
     activeFolderId = note.folderId || null;
     undoStack = []; lastTypeSnap = 0; refreshUndoBtn();  // history is per-note
-    updateStats();
-    updatePreview();
+    applyMode(note.mode === 'code' ? 'code' : 'notes', note.lang);  // mode is per-note
     renderTree();
     editor.focus();
     if (window.innerWidth <= 600) sidebar.classList.add('collapsed');
@@ -1296,6 +1388,11 @@
 
   // ── Stats ─────────────────────────────────────────────────
   function updateStats() {
+    if (isCodeMode()) {
+      const lines = editor.value.split('\n').length;
+      statsEl.textContent = `${lines.toLocaleString()} line${lines !== 1 ? 's' : ''} · ${editor.value.length.toLocaleString()} chars`;
+      return;
+    }
     const text = editor.value.trim();
     const words = text ? text.split(/\s+/).length : 0;
     statsEl.textContent = `${words.toLocaleString()} word${words !== 1 ? 's' : ''} · ${editor.value.length.toLocaleString()} chars`;
@@ -1435,6 +1532,7 @@
   }
 
   function updatePreview() {
+    if (isCodeMode()) { renderGutterAndHighlight(); scheduleCodeOutput(); return; }
     if (!editorWrap.classList.contains('split')) return;
     previewPane.innerHTML = renderMarkdown(editor.value);
   }
@@ -1448,6 +1546,102 @@
 
   document.getElementById('previewToggle').addEventListener('click', () => {
     setPreview(!editorWrap.classList.contains('split'));
+  });
+
+  // ── Code editor mode ──────────────────────────────────────
+  const isCodeMode = () => document.body.classList.contains('code-mode');
+
+  function currentNote() { return loadNotes().find(n => n.id === getActiveId()); }
+
+  function renderGutterAndHighlight() {
+    const src = editor.value;
+    const count = src.split('\n').length;
+    let nums = '';
+    for (let i = 1; i <= count; i++) nums += i + '\n';
+    gutter.textContent = nums;
+
+    const lang = langSelect.value;
+    let out;
+    try {
+      out = (lang && lang !== 'auto' && window.hljs.getLanguage(lang))
+        ? window.hljs.highlight(src, { language: lang, ignoreIllegals: true }).value
+        : window.hljs.highlightAuto(src).value;
+    } catch { out = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    // trailing newline keeps the last line's height in the <pre>
+    hlCode.innerHTML = out + '\n';
+    syncScroll();
+  }
+
+  function syncScroll() {
+    hlLayer.scrollTop = editor.scrollTop;
+    hlLayer.scrollLeft = editor.scrollLeft;
+    gutter.scrollTop = editor.scrollTop;
+  }
+  editor.addEventListener('scroll', syncScroll);
+
+  // Build a sandboxed document for the live output pane
+  function buildSrcdoc(code, lang) {
+    const l = (lang || '').toLowerCase();
+    if (l === 'html' || l === 'xml' || (l === 'auto' && /<(!doctype|html|body|div|h[1-6]|p|section|span|style|script)\b/i.test(code))) return code;
+    if (l === 'css') return `<style>${code}</style><div style="font:14px system-ui;padding:14px;color:#666">CSS loaded — add HTML to see it applied.</div>`;
+    if (l === 'javascript' || l === 'json') {
+      const safe = (l === 'json' ? `console.log(${code || 'null'})` : code).replace(/<\/script>/gi, '<\\/script>');
+      return `<body style="font:12.5px ui-monospace,Menlo,monospace;padding:10px;white-space:pre-wrap;color:#222"><script>
+        const _p=(...a)=>document.body.append(a.map(x=>typeof x==='object'?JSON.stringify(x,null,2):String(x)).join(' ')+'\\n');
+        console.log=_p; console.info=_p; console.warn=_p; console.error=_p;
+        window.onerror=(m)=>_p('Error: '+m);
+        try{ ${safe} }catch(e){ _p('Error: '+e.message) }
+      <\/script></body>`;
+    }
+    return code; // fall back to rendering as HTML
+  }
+
+  let codeOutTimer;
+  function scheduleCodeOutput() {
+    if (!editorWrap.classList.contains('split')) return;
+    clearTimeout(codeOutTimer);
+    codeOutTimer = setTimeout(() => {
+      codeOutput.srcdoc = buildSrcdoc(editor.value, langSelect.value);
+    }, 400);
+  }
+
+  function applyMode(mode, lang) {
+    const code = mode === 'code';
+    document.body.classList.toggle('code-mode', code);
+    const btn = document.getElementById('modeToggle');
+    btn.classList.toggle('active-btn', code);
+    btn.title = code ? 'Switch to notes' : 'Switch to code editor';
+    document.getElementById('previewToggle').title = code ? 'Toggle live output' : 'Toggle live preview';
+    langSelect.value = lang || 'auto';
+    editor.placeholder = code ? 'Write some code…' : 'Start writing…';
+    // No soft-wrap in code mode, so line numbers stay 1:1 with real lines
+    editor.setAttribute('wrap', code ? 'off' : 'soft');
+    // In code mode the font is always monospace; otherwise honour the font picker
+    editor.style.fontFamily = code ? '' : FONTS[document.getElementById('fontSelect').value];
+    if (!code) codeOutput.srcdoc = '';
+    updateStats();
+    updatePreview();
+  }
+
+  document.getElementById('modeToggle').addEventListener('click', () => {
+    const notes = loadNotes();
+    const idx = notes.findIndex(n => n.id === getActiveId());
+    if (idx === -1) return;
+    const next = notes[idx].mode === 'code' ? 'notes' : 'code';
+    notes[idx].mode = next;
+    saveNotes(notes);
+    applyMode(next, notes[idx].lang);
+    renderTree();
+    showToast(next === 'code' ? 'Code editor mode.' : 'Notes mode.');
+  });
+
+  langSelect.addEventListener('change', () => {
+    const notes = loadNotes();
+    const idx = notes.findIndex(n => n.id === getActiveId());
+    if (idx !== -1) { notes[idx].lang = langSelect.value; saveNotes(notes); }
+    renderGutterAndHighlight();
+    clearTimeout(codeOutTimer);
+    scheduleCodeOutput();
   });
 
   editor.addEventListener('keydown', e => {
@@ -1548,6 +1742,17 @@
       doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(20);
       doc.splitTextToSize(title, maxW).forEach(l => { ensure(26); doc.text(l, margin, y); y += 24; });
       doc.setDrawColor(185); doc.line(margin, y - 6, pw - margin, y - 6); y += 16;
+    }
+
+    // Code notes are printed verbatim in monospace — no Markdown parsing
+    if (isCodeMode()) {
+      doc.setFont('courier', 'normal'); doc.setFontSize(9.5); doc.setTextColor(34);
+      content.split('\n').forEach(line => {
+        doc.splitTextToSize(line || ' ', maxW).forEach(w => { ensure(13); doc.text(w, margin, y); y += 13; });
+      });
+      doc.save(getFilename('pdf'));
+      showToast(`Downloaded as ${getFilename('pdf')}`);
+      return;
     }
 
     const lines = content.split('\n');
