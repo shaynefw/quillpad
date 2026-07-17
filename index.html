@@ -506,8 +506,16 @@
       display: flex; align-items: center; justify-content: center;
       background: rgba(224,92,92,0.12); color: #e05c5c;
     }
+    .modal-icon.accent { background: rgba(124,106,247,0.14); color: var(--accent); }
     .modal-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 6px; }
     .modal-message { font-size: 0.82rem; color: var(--muted2); line-height: 1.45; margin-bottom: 18px; }
+    .modal-input {
+      width: 100%; margin: -6px 0 16px; padding: 9px 11px;
+      background: var(--btn-bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 0.85rem; font-family: var(--code-font);
+      outline: none; text-align: center;
+    }
+    .modal-input:focus { border-color: var(--accent); }
     .modal-actions { display: flex; gap: 8px; }
     .modal-btn {
       flex: 1; padding: 9px 12px; border-radius: 9px;
@@ -719,6 +727,10 @@
         </div>
       </div>
       <div class="download-group">
+        <button class="dl-btn" id="saveAsBtn" onclick="saveAs()" title="Save as… (choose name and extension)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Save As…</span>
+        </button>
         <button class="dl-btn" onclick="downloadAs('txt')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>.TXT</span>
@@ -748,6 +760,7 @@
     </div>
     <h3 class="modal-title" id="modalTitle">Delete this note?</h3>
     <p class="modal-message" id="modalMessage">This can't be undone.</p>
+    <input class="modal-input" id="modalInput" type="text" spellcheck="false" style="display:none" />
     <div class="modal-actions">
       <button class="modal-btn" id="modalCancel">Cancel</button>
       <button class="modal-btn danger" id="modalConfirm">Delete</button>
@@ -1553,6 +1566,29 @@
 
   function currentNote() { return loadNotes().find(n => n.id === getActiveId()); }
 
+  // hljs.highlightAuto guesses badly on short snippets (python→ruby, json→css),
+  // so use explicit heuristics for the languages we care about.
+  function detectLang(src) {
+    const s = (src || '').trim();
+    if (!s) return '';
+    if (/^\s*<(!doctype|html|head|body|div|h[1-6]|p\b|span|section|main|nav|ul|ol|li|table|form|img|a\b|script|style)/i.test(s)
+        || /<\/(div|p|body|html|span|h[1-6]|li|td|section)>/i.test(s)) return 'html';
+    if (/^[\[{]/.test(s) && /[\]}]$/.test(s)) { try { JSON.parse(s); return 'json'; } catch {} }
+    if (/^#!\s*\/\S*\b(ba|z)?sh\b/.test(s)
+        || /^\s*(echo|ls|cd|grep|chmod|mkdir|curl|sudo|apt-get|brew|npm|git)\s+\S/m.test(s)) return 'bash';
+    if (/^\s*(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|CREATE\s+(TABLE|INDEX)|ALTER\s+TABLE|DROP\s+TABLE)\b/im.test(s)) return 'sql';
+    if (/^\s*def\s+\w+\s*\(.*\)\s*:/m.test(s) || /^\s*class\s+\w+.*:\s*$/m.test(s)
+        || /^\s*(from\s+[\w.]+\s+)?import\s+[\w.]+\s*$/m.test(s)) return 'python';
+    if (/\b(function\s+\w*\s*\(|=>|const\s+\w+\s*=|let\s+\w+\s*=|var\s+\w+\s*=|console\.(log|error)|document\.|require\(|export\s+(default|const)|import\s+[\s\S]*\bfrom\b)/.test(s)) return 'javascript';
+    if (/[^{}]+\{[^{}]*[a-z-]+\s*:\s*[^;{}]+;?[^{}]*\}/i.test(s)) return 'css';
+    return '';
+  }
+
+  function activeLang() {
+    const sel = langSelect.value;
+    return sel === 'auto' ? detectLang(editor.value) : sel;
+  }
+
   function renderGutterAndHighlight() {
     const src = editor.value;
     const count = src.split('\n').length;
@@ -1560,13 +1596,13 @@
     for (let i = 1; i <= count; i++) nums += i + '\n';
     gutter.textContent = nums;
 
-    const lang = langSelect.value;
+    const lang = activeLang();
     let out;
     try {
-      out = (lang && lang !== 'auto' && window.hljs.getLanguage(lang))
+      out = (lang && window.hljs.getLanguage(lang))
         ? window.hljs.highlight(src, { language: lang, ignoreIllegals: true }).value
-        : window.hljs.highlightAuto(src).value;
-    } catch { out = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        : escHtml(src);   // unknown language → plain, never mis-coloured
+    } catch { out = escHtml(src); }
     // trailing newline keeps the last line's height in the <pre>
     hlCode.innerHTML = out + '\n';
     syncScroll();
@@ -1601,7 +1637,7 @@
     if (!editorWrap.classList.contains('split')) return;
     clearTimeout(codeOutTimer);
     codeOutTimer = setTimeout(() => {
-      codeOutput.srcdoc = buildSrcdoc(editor.value, langSelect.value);
+      codeOutput.srcdoc = buildSrcdoc(editor.value, activeLang() || 'html');
     }, 400);
   }
 
@@ -1659,7 +1695,54 @@
 
   // ── Downloads ─────────────────────────────────────────────
   function getFilename(ext) {
-    return (titleEl.value.trim() || 'note').replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-').toLowerCase() + '.' + ext;
+    const base = (titleEl.value.trim() || 'note').replace(/\.[a-z0-9]{1,8}$/i, ''); // drop an extension typed in the title
+    return (base.replace(/[^a-z0-9_\-\s]/gi, '').replace(/\s+/g, '-').toLowerCase() || 'note') + '.' + ext;
+  }
+
+  // Map the code language to a sensible file extension
+  const LANG_EXT = { html: 'html', xml: 'xml', css: 'css', javascript: 'js', json: 'json', python: 'py', bash: 'sh', sql: 'sql', markdown: 'md' };
+  function defaultExt() {
+    if (!isCodeMode()) return 'md';
+    return LANG_EXT[activeLang()] || 'txt';
+  }
+  // The note title drives the suggested filename; if it already has an extension, keep it
+  function suggestedFilename() {
+    const raw = (titleEl.value || '').trim();
+    const clean = s => s.replace(/[\/\\:*?"<>|]/g, '-').trim();
+    if (/\.[a-z0-9]{1,8}$/i.test(raw)) return clean(raw);
+    const base = clean(raw).replace(/\s+/g, '-').toLowerCase() || 'untitled';
+    return `${base}.${defaultExt()}`;
+  }
+
+  async function saveAs() {
+    const content = editor.value;
+    if (!content.trim()) { showToast('Nothing to save yet.'); return; }
+    const suggested = suggestedFilename();
+
+    // Native save dialog — lets the user edit the name/extension right there
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({ suggestedName: suggested });
+        const writable = await handle.createWritable();
+        await writable.write(new Blob([content], { type: 'text/plain' }));
+        await writable.close();
+        showToast(`Saved as ${handle.name}`);
+      } catch (err) {
+        if (err.name !== 'AbortError') showToast('Could not save the file.');
+      }
+      return;
+    }
+
+    // Fallback (Safari/Firefox): ask for the filename in-page, then download
+    const name = await promptDialog({
+      title: 'Save as',
+      message: 'Edit the file name and extension, then save.',
+      value: suggested,
+      confirmText: 'Save'
+    });
+    if (!name) return;
+    triggerDownload(new Blob([content], { type: 'text/plain' }), name);
+    showToast(`Downloaded as ${name}`);
   }
   function downloadAs(type) {
     if (!editor.value.trim()) { showToast('Nothing to download yet.'); return; }
@@ -2028,14 +2111,27 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
   }
 
-  // ── In-page confirmation modal (replaces window.confirm) ──
-  function confirmDialog({ title = 'Are you sure?', message = '', confirmText = 'Delete' } = {}) {
+  // ── In-page modal (replaces window.confirm / window.prompt) ──
+  const MODAL_ICONS = {
+    trash: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`,
+    save:  `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`
+  };
+
+  function modalDialog({ title = 'Are you sure?', message = '', confirmText = 'OK',
+                         danger = true, icon = 'trash', withInput = false, value = '' } = {}) {
     const overlay = document.getElementById('modalOverlay');
     const confirmBtn = document.getElementById('modalConfirm');
     const cancelBtn = document.getElementById('modalCancel');
+    const input = document.getElementById('modalInput');
+    const iconEl = document.getElementById('modalIcon');
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalMessage').textContent = message;
     confirmBtn.textContent = confirmText;
+    confirmBtn.classList.toggle('danger', danger);
+    iconEl.classList.toggle('accent', icon !== 'trash');
+    iconEl.innerHTML = MODAL_ICONS[icon] || MODAL_ICONS.trash;
+    input.style.display = withInput ? '' : 'none';
+    if (withInput) input.value = value;
 
     return new Promise(resolve => {
       const close = (result) => {
@@ -2046,21 +2142,29 @@
         document.removeEventListener('keydown', onKey);
         resolve(result);
       };
-      const onConfirm = () => close(true);
-      const onCancel  = () => close(false);
-      const onBackdrop = e => { if (e.target === overlay) close(false); };
+      const onConfirm = () => close(withInput ? (input.value.trim() || null) : true);
+      const onCancel  = () => close(withInput ? null : false);
+      const onBackdrop = e => { if (e.target === overlay) onCancel(); };
       const onKey = e => {
-        if (e.key === 'Escape') close(false);
-        if (e.key === 'Enter')  close(true);
+        if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        if (e.key === 'Enter')  { e.preventDefault(); onConfirm(); }
       };
       confirmBtn.addEventListener('click', onConfirm);
       cancelBtn.addEventListener('click', onCancel);
       overlay.addEventListener('mousedown', onBackdrop);
       document.addEventListener('keydown', onKey);
       overlay.classList.add('show');
-      confirmBtn.focus();
+      if (withInput) {
+        input.focus();
+        // Pre-select just the base name so the extension is easy to keep
+        const dot = input.value.lastIndexOf('.');
+        input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
+      } else confirmBtn.focus();
     });
   }
+
+  const confirmDialog = opts => modalDialog(Object.assign({ confirmText: 'Delete', danger: true, icon: 'trash' }, opts));
+  const promptDialog  = opts => modalDialog(Object.assign({ confirmText: 'Save', danger: false, icon: 'save', withInput: true }, opts));
 
   function relativeTime(ts) {
     const mins = Math.floor((Date.now() - ts) / 60000);
