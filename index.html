@@ -2054,7 +2054,12 @@
     if (!editor.value.trim()) { showToast('Nothing to download yet.'); return; }
     if (type === 'txt') triggerDownload(new Blob([editor.value], { type: 'text/plain' }), getFilename('txt'));
     else if (type === 'md') triggerDownload(new Blob([editor.value], { type: 'text/markdown' }), getFilename('md'));
-    else if (type === 'pdf') { generatePDF(editor.value); return; }
+    else if (type === 'pdf') {
+      const custom = !isCodeMode() && PDF_FONTS[document.getElementById('fontSelect').value];
+      if (custom) showToast('Preparing PDF…');
+      generatePDF(editor.value).catch(() => showToast('Could not generate the PDF.'));
+      return;
+    }
     showToast(`Downloaded as ${getFilename(type)}`);
   }
   function triggerDownload(blob, filename) {
@@ -2087,7 +2092,44 @@
     return runs;
   }
 
-  function generatePDF(content) {
+  // ── Embed the editor font into exported PDFs ──────────────
+  // jsPDF only ships Helvetica/Times/Courier, so custom fonts are fetched as TTF
+  // (from the @expo-google-fonts packages on jsDelivr) and registered per document.
+  const PDF_FONTS = {
+    book:        { family: 'Lora',          pkg: 'lora',           files: [['Lora_400Regular', 'normal'], ['Lora_700Bold', 'bold'], ['Lora_400Regular_Italic', 'italic']] },
+    rounded:     { family: 'Comfortaa',     pkg: 'comfortaa',      files: [['Comfortaa_400Regular', 'normal'], ['Comfortaa_700Bold', 'bold']] },
+    cursive:     { family: 'DancingScript', pkg: 'dancing-script', files: [['DancingScript_400Regular', 'normal'], ['DancingScript_700Bold', 'bold']] },
+    handwriting: { family: 'Caveat',        pkg: 'caveat',         files: [['Caveat_400Regular', 'normal'], ['Caveat_700Bold', 'bold']] },
+  };
+  const ALL_STYLES = () => new Set(['normal', 'bold', 'italic', 'bolditalic']);
+  const _ttfCache = {};
+  async function fetchTTFBase64(url) {
+    if (_ttfCache[url]) return _ttfCache[url];
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('font fetch failed');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return (_ttfCache[url] = btoa(bin));
+  }
+  async function embedPdfFont(doc, key) {
+    const BUILTIN = { sans: 'helvetica', serif: 'times', mono: 'courier' };
+    if (BUILTIN[key]) return { family: BUILTIN[key], styles: ALL_STYLES() };
+    const def = PDF_FONTS[key];
+    if (!def) return { family: 'helvetica', styles: ALL_STYLES() };
+    const styles = new Set();
+    for (const [file, style] of def.files) {
+      try {
+        const b64 = await fetchTTFBase64(`https://cdn.jsdelivr.net/npm/@expo-google-fonts/${def.pkg}/${file}.ttf`);
+        doc.addFileToVFS(`${file}.ttf`, b64);
+        doc.addFont(`${file}.ttf`, def.family, style);
+        styles.add(style);
+      } catch (e) { /* skip a weight we couldn't load */ }
+    }
+    return styles.size ? { family: def.family, styles } : { family: 'helvetica', styles: ALL_STYLES() };
+  }
+
+  async function generatePDF(content) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
     const margin = 60, pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
@@ -2095,12 +2137,22 @@
     let y = margin;
     const ensure = need => { if (y + need > ph - margin) { doc.addPage(); y = margin; } };
 
+    // The note's editor font, embedded so body text carries into the PDF
+    let BODY = { family: 'helvetica', styles: ALL_STYLES() };
+    const bodyStyle = want => {
+      if (BODY.styles.has(want)) return want;
+      if (want === 'bolditalic') return BODY.styles.has('bold') ? 'bold' : BODY.styles.has('italic') ? 'italic' : 'normal';
+      if (want === 'bold')       return BODY.styles.has('bold') ? 'bold' : 'normal';
+      return 'normal';   // italic → normal when the face has no italic
+    };
+
     // Draw styled runs with word wrapping; hanging-indents to x0. Returns baseline y of last line.
     function drawRuns(runs, x0, size, lineH) {
       let x = x0;
       runs.forEach(run => {
         const style = run.b && run.i ? 'bolditalic' : run.b ? 'bold' : run.i ? 'italic' : 'normal';
-        doc.setFont(run.code ? 'courier' : 'helvetica', style);
+        if (run.code) doc.setFont('courier', run.b ? 'bold' : 'normal');
+        else doc.setFont(BODY.family, bodyStyle(style));
         doc.setFontSize(size);
         run.t.split(/(\s+)/).forEach(word => {
           if (!word) return;
@@ -2122,7 +2174,7 @@
           x += w;
         });
       });
-      doc.setTextColor(34); doc.setFont('helvetica', 'normal');
+      doc.setTextColor(34); doc.setFont(BODY.family, bodyStyle('normal'));
       return y;
     }
 
@@ -2143,6 +2195,9 @@
       showToast(`Downloaded as ${getFilename('pdf')}`);
       return;
     }
+
+    // Notes mode: embed the chosen editor font so body text matches the app
+    BODY = await embedPdfFont(doc, document.getElementById('fontSelect').value);
 
     const lines = content.split('\n');
     let inCode = false;
@@ -2168,7 +2223,9 @@
         const size = 11, lh = size * 1.5;
         ensure(lh); doc.setFillColor(201, 195, 236); doc.rect(margin, y - size * 0.8, 3, lh, 'F');
         doc.setTextColor(110);
-        y = drawRuns(mdInline(m[1]).map(r => Object.assign(r, { i: true })), margin + 12, size, lh);
+        // Italic if the face has it, else just the quote styling carries the emphasis
+        const useItalic = BODY.styles.has('italic');
+        y = drawRuns(mdInline(m[1]).map(r => Object.assign(r, { i: useItalic })), margin + 12, size, lh);
         y += lh; continue;
       }
       let prefix = '';
@@ -2177,7 +2234,7 @@
       const size = 11, lh = size * 1.55;
       ensure(lh);
       let startX = margin;
-      if (prefix) { doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(34); doc.text(prefix, margin, y); startX = margin + doc.getTextWidth(prefix); }
+      if (prefix) { doc.setFont(BODY.family, bodyStyle('normal')); doc.setFontSize(size); doc.setTextColor(34); doc.text(prefix, margin, y); startX = margin + doc.getTextWidth(prefix); }
       y = drawRuns(mdInline(line), startX, size, lh);
       y += lh;
     }
