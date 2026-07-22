@@ -11,6 +11,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Comfortaa:wght@400;500;600&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -816,9 +819,12 @@
       </span>
       <span class="md-only">
       <select class="font-select" id="fontSelect">
-        <option value="sans">Sans-serif</option>
-        <option value="serif">Serif</option>
-        <option value="mono">Monospace</option>
+        <option value="sans"    style="font-family:-apple-system,sans-serif">Sans-serif</option>
+        <option value="serif"   style="font-family:Georgia,serif">Serif</option>
+        <option value="book"    style='font-family:"Lora",Georgia,serif'>Lora (book)</option>
+        <option value="rounded" style='font-family:"Comfortaa",sans-serif'>Rounded</option>
+        <option value="cursive" style='font-family:"Caveat","Snell Roundhand",cursive;font-size:1.15em'>Cursive</option>
+        <option value="mono"    style='font-family:"SF Mono",monospace'>Monospace</option>
       </select>
       <div class="toolbar-divider"></div>
       <button class="toolbar-btn" title="Bold (⌘B)" onclick="wrapSelection('**','**')"><b>B</b></button>
@@ -949,9 +955,12 @@
   const langSelect  = document.getElementById('langSelect');
 
   const FONTS = {
-    sans:  '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    serif: 'Georgia, "Times New Roman", serif',
-    mono:  '"SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace'
+    sans:     '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    serif:    'Georgia, "Times New Roman", serif',
+    mono:     '"SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace',
+    rounded:  '"Comfortaa", "SF Pro Rounded", "Arial Rounded MT Bold", -apple-system, sans-serif',
+    cursive:  '"Caveat", "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive',
+    book:     '"Lora", Georgia, "Times New Roman", serif'
   };
 
   // ── State ─────────────────────────────────────────────────
@@ -1699,8 +1708,15 @@
   }
 
   // ── Font ──────────────────────────────────────────────────
+  // Some faces render visually smaller/larger at the same px — nudge the size to match
+  const FONT_SIZE = { cursive: '1.35rem', rounded: '1.02rem' };
+  function applyEditorFont(key) {
+    if (isCodeMode()) return;   // code mode is always monospace at --code-size
+    editor.style.fontFamily = FONTS[key] || FONTS.sans;
+    editor.style.fontSize = FONT_SIZE[key] || '';   // '' → falls back to the CSS 1rem
+  }
   document.getElementById('fontSelect').addEventListener('change', e => {
-    editor.style.fontFamily = FONTS[e.target.value];
+    applyEditorFont(e.target.value);
     localStorage.setItem('quillpad_font', e.target.value);
   });
 
@@ -1940,7 +1956,8 @@
     // No soft-wrap in code mode, so line numbers stay 1:1 with real lines
     editor.setAttribute('wrap', code ? 'off' : 'soft');
     // In code mode the font is always monospace; otherwise honour the font picker
-    editor.style.fontFamily = code ? '' : FONTS[document.getElementById('fontSelect').value];
+    if (code) { editor.style.fontFamily = ''; editor.style.fontSize = ''; }
+    else applyEditorFont(document.getElementById('fontSelect').value);
     if (!code) codeOutput.srcdoc = '';
     updateStats();
     updatePreview();
@@ -2500,9 +2517,9 @@
 
     const theme = localStorage.getItem('quillpad_theme') || 'dark';
     document.body.dataset.theme = theme; updateThemeIcon(theme);
-    const font = localStorage.getItem('quillpad_font') || 'sans';
+    const font = FONTS[localStorage.getItem('quillpad_font')] ? localStorage.getItem('quillpad_font') : 'sans';
     document.getElementById('fontSelect').value = font;
-    editor.style.fontFamily = FONTS[font];
+    applyEditorFont(font);
 
     // Live preview: remembers the user's choice; defaults off on phones (too narrow to split)
     const prevPref = localStorage.getItem('quillpad_preview');
