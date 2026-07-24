@@ -1564,6 +1564,7 @@
     titleEl.value  = note.title;
     editor.value   = note.content;
     activeFolderId = note.folderId || null;
+    textColor = note.textColor || '';   // text colour is per-note
     undoStack = []; lastTypeSnap = 0; refreshUndoBtn();  // history is per-note
     applyMode(note.mode === 'code' ? 'code' : 'notes', note.lang);  // mode is per-note
     renderTree();
@@ -1797,8 +1798,8 @@
   }
   editor.addEventListener('scroll', () => { if (!isCodeMode()) { notesHL.scrollTop = editor.scrollTop; notesHL.scrollLeft = editor.scrollLeft; } });
 
-  // ── Text colour (screen only) & highlight colour ──
-  let textColor = localStorage.getItem('quillpad_textColor') || '';
+  // ── Text colour (per note, screen only) & highlight colour ──
+  let textColor = '';   // reflects the active note's chosen colour
   let hlColor   = localStorage.getItem('quillpad_hlColor')   || '';
   const TEXT_COLORS = ['#e05c5c', '#e8873c', '#e6c020', '#57bd6b', '#33bdbd', '#5c8ce0', '#7c6af7', '#c56ae0', '#e06aa8', '#9aa0aa'];
   const HL_COLORS   = ['rgba(255,224,100,0.5)', 'rgba(124,247,150,0.4)', 'rgba(120,190,255,0.45)', 'rgba(255,150,200,0.45)', 'rgba(124,106,247,0.42)', 'rgba(255,170,90,0.5)'];
@@ -1806,6 +1807,14 @@
   function applyTextColor() {
     if (!isCodeMode()) editor.style.color = textColor || '';
     document.getElementById('textColorBar').style.background = textColor || 'var(--accent)';
+  }
+  // Persist the colour on the active note (not globally) — it's a per-note style
+  function setNoteTextColor(c) {
+    textColor = c;
+    const notes = loadNotes();
+    const i = notes.findIndex(n => n.id === getActiveId());
+    if (i !== -1) { notes[i].textColor = c || undefined; saveNotes(notes, true); }  // silent: a style tweak, not a content edit
+    applyTextColor();
   }
   function applyHlColor() {
     if (hlColor) document.documentElement.style.setProperty('--hl-color', hlColor);
@@ -1844,10 +1853,10 @@
       `<div class="pop-row"><input type="color" id="textColorCustom" value="${textColor || '#7c6af7'}"><span>Custom · screen only</span></div>`);
     popMenu.dataset.for = 'text';
     popMenu.querySelectorAll('.pop-swatch').forEach(s => s.addEventListener('click', () => {
-      textColor = s.dataset.color; localStorage.setItem('quillpad_textColor', textColor); applyTextColor(); closePopup(); editor.focus();
+      setNoteTextColor(s.dataset.color); closePopup(); editor.focus();
     }));
     popMenu.querySelector('#textColorCustom').addEventListener('input', ev => {
-      textColor = ev.target.value; localStorage.setItem('quillpad_textColor', textColor); applyTextColor();
+      setNoteTextColor(ev.target.value);
     });
   });
 
