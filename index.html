@@ -34,6 +34,7 @@
       --folder-active: #241f38;
       --code-font: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
       --code-size: 0.85rem;
+      --hl-color: rgba(124,106,247,0.35);
     }
     [data-theme="light"] {
       --bg: #e8e3fa; --surface: #f6f3ff; --sidebar: #ded7f4; --border: #cfc6ec;
@@ -349,6 +350,49 @@
     #editor::placeholder { color: var(--muted); }
     .gutter, .hl-layer { display: none; }
 
+    /* Highlight overlay behind the notes textarea (shows ==marks== live while typing) */
+    .notes-hl {
+      display: none; position: absolute; inset: 0; margin: 0; padding: 0;
+      overflow: hidden; pointer-events: none; z-index: 0;
+      font-size: 1rem; line-height: 1.75;
+      white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
+      color: transparent; -webkit-text-fill-color: transparent;
+    }
+    body:not(.code-mode) .notes-hl.active { display: block; }
+    body:not(.code-mode) #editor { position: absolute; inset: 0; background: transparent; z-index: 1; }
+    .notes-hl mark { color: transparent; -webkit-text-fill-color: transparent; border-radius: 3px; background: var(--hl-color); }
+
+    /* Toolbar colour swatches */
+    .swatch-btn { position: relative; flex-direction: column; gap: 1px; padding-bottom: 6px; }
+    .swatch-bar {
+      position: absolute; left: 5px; right: 5px; bottom: 3px; height: 3px; border-radius: 2px;
+      background: var(--accent);
+    }
+
+    /* Popup menu (colour palette / divider picker) */
+    .pop-menu {
+      position: fixed; z-index: 260; display: none;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+    .pop-menu.visible { display: block; }
+    .pop-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+    .pop-swatch {
+      width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+      border: 1px solid rgba(128,128,128,0.35);
+    }
+    .pop-swatch.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .pop-swatch.none { display: flex; align-items: center; justify-content: center; background: var(--btn-bg); color: var(--muted2); font-size: 0.7rem; }
+    .pop-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.75rem; color: var(--muted2); }
+    .pop-row input[type=color] { width: 28px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+    .pop-divider-list { display: flex; flex-direction: column; gap: 2px; min-width: 200px; max-height: 260px; overflow-y: auto; }
+    .pop-divider {
+      padding: 7px 9px; border-radius: 6px; cursor: pointer;
+      font-family: var(--code-font); font-size: 0.72rem; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pop-divider:hover { background: var(--item-hover); }
+
     /* ── Code editor mode ── */
     .md-only { display: contents; }
     body.code-mode .md-only { display: none; }
@@ -435,7 +479,7 @@
       margin: 0 0 0.7em; padding: 2px 0 2px 14px;
       border-left: 3px solid var(--accent); color: var(--muted2);
     }
-    .preview-pane mark { background: rgba(124,106,247,0.28); color: inherit; border-radius: 3px; padding: 0 2px; }
+    .preview-pane mark { background: var(--hl-color); color: inherit; border-radius: 3px; padding: 0 2px; }
     .preview-pane del { opacity: 0.7; }
     .preview-pane hr { border: none; border-top: 1px solid var(--border); margin: 1em 0; }
 
@@ -841,6 +885,17 @@
       <button class="toolbar-btn" title="Link (⌘K)" onclick="insertLink()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       </button>
+      <button class="toolbar-btn swatch-btn" id="textColorBtn" title="Text colour (screen only)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16L12 4l5 12"/><path d="M8.5 13h7"/></svg>
+        <span class="swatch-bar" id="textColorBar"></span>
+      </button>
+      <button class="toolbar-btn swatch-btn" id="hlColorBtn" title="Highlight colour">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-4 4v3h3l4-4"/><path d="M15 5l4 4-8 8-4-4z"/></svg>
+        <span class="swatch-bar" id="hlColorBar"></span>
+      </button>
+      <button class="toolbar-btn" id="dividerBtn" title="Insert a divider">
+        <svg width="16" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/><circle cx="7" cy="12" r="0.6" fill="currentColor"/><circle cx="17" cy="12" r="0.6" fill="currentColor"/></svg>
+      </button>
       <div class="toolbar-divider"></div>
       <button class="toolbar-btn" onclick="insertPrefix('# ')">H1</button>
       <button class="toolbar-btn" onclick="insertPrefix('## ')">H2</button>
@@ -860,6 +915,7 @@
         <div class="gutter" id="gutter" aria-hidden="true"></div>
         <div class="edit-area" id="editArea">
           <pre class="hl-layer" id="hlLayer" aria-hidden="true"><code id="hlCode"></code></pre>
+          <div class="notes-hl" id="notesHL" aria-hidden="true"></div>
           <textarea id="editor" placeholder="Start writing…" spellcheck="true" autofocus></textarea>
         </div>
       </div>
@@ -903,6 +959,7 @@
 
 <!-- Context menu -->
 <div class="ctx-menu" id="ctxMenu"></div>
+<div class="pop-menu" id="popMenu"></div>
 <div class="toast" id="toast"></div>
 
 <!-- Manage notes & folders -->
@@ -954,6 +1011,8 @@
   const hlCode      = document.getElementById('hlCode');
   const codeOutput  = document.getElementById('codeOutput');
   const langSelect  = document.getElementById('langSelect');
+  const notesHL     = document.getElementById('notesHL');
+  const popMenu     = document.getElementById('popMenu');
 
   const FONTS = {
     sans:     '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -1525,6 +1584,7 @@
     const hasContentNow = (titleEl.value || '').trim() || (editor.value || '').trim();
     if (!!hadContentBefore !== !!hasContentNow) updateBackupStatus();
     updatePreview();
+    renderNotesHighlight();
   }
 
   editor.addEventListener('input',  () => { updateStats(); saveActive(); });
@@ -1716,10 +1776,127 @@
     if (isCodeMode()) return;   // code mode is always monospace at --code-size
     editor.style.fontFamily = FONTS[key] || FONTS.sans;
     editor.style.fontSize = FONT_SIZE[key] || '';   // '' → falls back to the CSS 1rem
+    // Mirror onto the highlight overlay so marks line up exactly
+    notesHL.style.fontFamily = editor.style.fontFamily;
+    notesHL.style.fontSize = editor.style.fontSize;
+    renderNotesHighlight();
   }
   document.getElementById('fontSelect').addEventListener('change', e => {
     applyEditorFont(e.target.value);
     localStorage.setItem('quillpad_font', e.target.value);
+  });
+
+  // ── Live highlight overlay (shows ==marks== behind the notes textarea) ──
+  function renderNotesHighlight() {
+    if (isCodeMode()) { notesHL.classList.remove('active'); return; }
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    notesHL.innerHTML = esc(editor.value).replace(/==([^=\n]+)==/g, m => `<mark>${m}</mark>`) + '\n';
+    notesHL.classList.add('active');
+    notesHL.scrollTop = editor.scrollTop;
+    notesHL.scrollLeft = editor.scrollLeft;
+  }
+  editor.addEventListener('scroll', () => { if (!isCodeMode()) { notesHL.scrollTop = editor.scrollTop; notesHL.scrollLeft = editor.scrollLeft; } });
+
+  // ── Text colour (screen only) & highlight colour ──
+  let textColor = localStorage.getItem('quillpad_textColor') || '';
+  let hlColor   = localStorage.getItem('quillpad_hlColor')   || '';
+  const TEXT_COLORS = ['#e05c5c', '#e8873c', '#e6c020', '#57bd6b', '#33bdbd', '#5c8ce0', '#7c6af7', '#c56ae0', '#e06aa8', '#9aa0aa'];
+  const HL_COLORS   = ['rgba(255,224,100,0.5)', 'rgba(124,247,150,0.4)', 'rgba(120,190,255,0.45)', 'rgba(255,150,200,0.45)', 'rgba(124,106,247,0.42)', 'rgba(255,170,90,0.5)'];
+
+  function applyTextColor() {
+    if (!isCodeMode()) editor.style.color = textColor || '';
+    document.getElementById('textColorBar').style.background = textColor || 'var(--accent)';
+  }
+  function applyHlColor() {
+    if (hlColor) document.documentElement.style.setProperty('--hl-color', hlColor);
+    else document.documentElement.style.removeProperty('--hl-color');
+    document.getElementById('hlColorBar').style.background = hlColor || 'var(--hl-color)';
+  }
+
+  // ── Popup menu (colour palette / divider picker) ──
+  function openPopup(anchor, html) {
+    popMenu.innerHTML = html;
+    popMenu.classList.add('visible');
+    popMenu.style.left = '0'; popMenu.style.top = '0';
+    const r = anchor.getBoundingClientRect();
+    const w = popMenu.offsetWidth, h = popMenu.offsetHeight;
+    let left = Math.max(6, Math.min(r.left, window.innerWidth - w - 8));
+    let top = r.bottom + 6;
+    if (top + h > window.innerHeight - 6) top = Math.max(6, r.top - h - 6);
+    popMenu.style.left = left + 'px'; popMenu.style.top = top + 'px';
+  }
+  function closePopup() { popMenu.classList.remove('visible'); }
+  const popOpenFor = a => popMenu.classList.contains('visible') && popMenu.dataset.for === a;
+  document.addEventListener('mousedown', e => {
+    if (!popMenu.contains(e.target) && !e.target.closest('#textColorBtn,#hlColorBtn,#dividerBtn')) closePopup();
+  });
+
+  function swatchGrid(colors, current, extraNone) {
+    let h = '<div class="pop-swatches">';
+    if (extraNone) h += `<div class="pop-swatch none${!current ? ' sel' : ''}" data-color="">A</div>`;
+    colors.forEach(c => h += `<div class="pop-swatch${current === c ? ' sel' : ''}" style="background:${c}" data-color="${c}"></div>`);
+    return h + '</div>';
+  }
+
+  document.getElementById('textColorBtn').addEventListener('click', e => {
+    if (popOpenFor('text')) { closePopup(); return; }
+    openPopup(e.currentTarget, swatchGrid(TEXT_COLORS, textColor, true) +
+      `<div class="pop-row"><input type="color" id="textColorCustom" value="${textColor || '#7c6af7'}"><span>Custom · screen only</span></div>`);
+    popMenu.dataset.for = 'text';
+    popMenu.querySelectorAll('.pop-swatch').forEach(s => s.addEventListener('click', () => {
+      textColor = s.dataset.color; localStorage.setItem('quillpad_textColor', textColor); applyTextColor(); closePopup(); editor.focus();
+    }));
+    popMenu.querySelector('#textColorCustom').addEventListener('input', ev => {
+      textColor = ev.target.value; localStorage.setItem('quillpad_textColor', textColor); applyTextColor();
+    });
+  });
+
+  document.getElementById('hlColorBtn').addEventListener('click', e => {
+    if (popOpenFor('hl')) { closePopup(); return; }
+    openPopup(e.currentTarget, swatchGrid(HL_COLORS, hlColor, false) +
+      `<div class="pop-row"><input type="color" id="hlColorCustom" value="#ffe066"><span>Highlight colour</span></div>`);
+    popMenu.dataset.for = 'hl';
+    popMenu.querySelectorAll('.pop-swatch').forEach(s => s.addEventListener('click', () => {
+      hlColor = s.dataset.color; localStorage.setItem('quillpad_hlColor', hlColor); applyHlColor(); closePopup(); editor.focus();
+    }));
+    popMenu.querySelector('#hlColorCustom').addEventListener('input', ev => {
+      const v = ev.target.value, r = parseInt(v.slice(1,3),16), g = parseInt(v.slice(3,5),16), b = parseInt(v.slice(5,7),16);
+      hlColor = `rgba(${r},${g},${b},0.5)`; localStorage.setItem('quillpad_hlColor', hlColor); applyHlColor();
+    });
+  });
+
+  // ── Dividers ──
+  const DIVIDERS = [
+    '════════════════════════════',
+    '────────────────────────────',
+    '━━━━━━━━━━━━━━━━━━━━━━━━',
+    '- - - - - - - - - - - - - - - - -',
+    '• • • • • • • • • • • • • • • •',
+    '· · · · · · · · · · · · · · · · · ·',
+    '~~~~~~~~~~~~~~~~~~~~~~~~',
+    '✦ ─────────────────── ✦',
+    '❖ ═══════════════════ ❖',
+    '✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿',
+    '↞──────────────────────↠',
+    '▂▃▄▅▆▇█▇▆▅▄▃▂',
+    '◆◇◆◇◆◇◆◇◆◇◆◇◆◇',
+    '＝＝＝＝＝＝＝＝＝＝＝＝'
+  ];
+  function insertDivider(text) {
+    recordUndo();
+    const s = editor.selectionStart;
+    const before = editor.value.slice(0, s);
+    const after = editor.value.slice(editor.selectionEnd);
+    const lead = (before.length && !before.endsWith('\n')) ? '\n' : '';
+    const trail = (after.startsWith('\n') || !after.length) ? '\n' : '\n';
+    editor.setRangeText(lead + text + trail, s, editor.selectionEnd, 'end');
+    editor.focus(); saveActive();
+  }
+  document.getElementById('dividerBtn').addEventListener('click', e => {
+    if (popOpenFor('divider')) { closePopup(); return; }
+    openPopup(e.currentTarget, `<div class="pop-divider-list">${DIVIDERS.map((d, i) => `<div class="pop-divider" data-i="${i}">${escHtml(d)}</div>`).join('')}</div>`);
+    popMenu.dataset.for = 'divider';
+    popMenu.querySelectorAll('.pop-divider').forEach(el => el.addEventListener('click', () => { insertDivider(DIVIDERS[+el.dataset.i]); closePopup(); }));
   });
 
   // ── Theme ─────────────────────────────────────────────────
@@ -1958,11 +2135,12 @@
     // No soft-wrap in code mode, so line numbers stay 1:1 with real lines
     editor.setAttribute('wrap', code ? 'off' : 'soft');
     // In code mode the font is always monospace; otherwise honour the font picker
-    if (code) { editor.style.fontFamily = ''; editor.style.fontSize = ''; }
-    else applyEditorFont(document.getElementById('fontSelect').value);
+    if (code) { editor.style.fontFamily = ''; editor.style.fontSize = ''; editor.style.color = ''; }
+    else { applyEditorFont(document.getElementById('fontSelect').value); applyTextColor(); }
     if (!code) codeOutput.srcdoc = '';
     updateStats();
     updatePreview();
+    renderNotesHighlight();
   }
 
   document.getElementById('modeToggle').addEventListener('click', () => {
@@ -2579,6 +2757,8 @@
     const font = FONTS[localStorage.getItem('quillpad_font')] ? localStorage.getItem('quillpad_font') : 'sans';
     document.getElementById('fontSelect').value = font;
     applyEditorFont(font);
+    applyTextColor();
+    applyHlColor();
 
     // Live preview: remembers the user's choice; defaults off on phones (too narrow to split)
     const prevPref = localStorage.getItem('quillpad_preview');
