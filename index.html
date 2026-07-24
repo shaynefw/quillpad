@@ -350,17 +350,20 @@
     #editor::placeholder { color: var(--muted); }
     .gutter, .hl-layer { display: none; }
 
-    /* Highlight overlay behind the notes textarea (shows ==marks== live while typing) */
+    /* Overlay behind the notes textarea: shows ==marks== and per-character colours live */
     .notes-hl {
       display: none; position: absolute; inset: 0; margin: 0; padding: 0;
       overflow: hidden; pointer-events: none; z-index: 0;
       font-size: 1rem; line-height: 1.75;
       white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
-      color: transparent; -webkit-text-fill-color: transparent;
+      color: transparent;   /* transparent = only highlight backgrounds show; editor supplies the text */
     }
     body:not(.code-mode) .notes-hl.active { display: block; }
     body:not(.code-mode) #editor { position: absolute; inset: 0; background: transparent; z-index: 1; }
-    .notes-hl mark { color: transparent; -webkit-text-fill-color: transparent; border-radius: 3px; background: var(--hl-color); }
+    .notes-hl mark { color: inherit; border-radius: 3px; background: var(--hl-color); }
+    /* When a note has coloured ranges, the overlay becomes the visible text and the textarea goes transparent */
+    body.notes-colored:not(.code-mode) .notes-hl { color: var(--text); }
+    body.notes-colored:not(.code-mode) #editor { color: transparent; }
 
     /* Toolbar colour swatches */
     .swatch-btn { position: relative; flex-direction: column; gap: 1px; padding-bottom: 6px; }
@@ -1564,7 +1567,9 @@
     titleEl.value  = note.title;
     editor.value   = note.content;
     activeFolderId = note.folderId || null;
-    textColor = note.textColor || '';   // text colour is per-note
+    textColor = note.textColor || '';                          // whole-note base colour (per note)
+    colorRanges = (note.colors || []).map(r => ({ ...r }));     // per-character colours (per note)
+    prevText = note.content;
     undoStack = []; lastTypeSnap = 0; refreshUndoBtn();  // history is per-note
     applyMode(note.mode === 'code' ? 'code' : 'notes', note.lang);  // mode is per-note
     renderTree();
@@ -1576,14 +1581,18 @@
     const id = getActiveId(); if (!id) return;
     const notes = loadNotes();
     const idx = notes.findIndex(n => n.id === id); if (idx === -1) return;
+    // Keep per-character colour ranges aligned with the edited text
+    if (editor.value !== prevText) { remapRanges(prevText, editor.value); prevText = editor.value; }
     const hadContentBefore = (notes[idx].title || '').trim() || (notes[idx].content || '').trim();
     notes[idx].title     = titleEl.value;
     notes[idx].content   = editor.value;
     notes[idx].updatedAt = Date.now();
+    notes[idx].colors    = colorRanges.length ? colorRanges : undefined;
     saveNotes(notes);
     renderTree();
     const hasContentNow = (titleEl.value || '').trim() || (editor.value || '').trim();
     if (!!hadContentBefore !== !!hasContentNow) updateBackupStatus();
+    updateColoredMode();
     updatePreview();
     renderNotesHighlight();
   }
@@ -1787,34 +1796,108 @@
     localStorage.setItem('quillpad_font', e.target.value);
   });
 
-  // ── Live highlight overlay (shows ==marks== behind the notes textarea) ──
+  // ── Colour model (per note, screen only) & highlight colour ──
+  let textColor   = '';   // whole-note base colour (used when nothing is selected)
+  let colorRanges = [];   // per-character colour: [{ s, e, c }] over editor text offsets
+  let prevText    = '';   // last-seen editor value, for remapping ranges on edit
+  let hlColor     = localStorage.getItem('quillpad_hlColor') || '';
+  const TEXT_COLORS = ['#e05c5c', '#e8873c', '#e6c020', '#57bd6b', '#33bdbd', '#5c8ce0', '#7c6af7', '#c56ae0', '#e06aa8', '#9aa0aa'];
+  const HL_COLORS   = ['rgba(255,224,100,0.5)', 'rgba(124,247,150,0.4)', 'rgba(120,190,255,0.45)', 'rgba(255,150,200,0.45)', 'rgba(124,106,247,0.42)', 'rgba(255,170,90,0.5)'];
+  const escC = c => c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c;
+
+  // Overlay becomes the visible text layer only when the note has coloured ranges
+  function updateColoredMode() {
+    const colored = !isCodeMode() && colorRanges.length > 0;
+    document.body.classList.toggle('notes-colored', colored);
+    if (isCodeMode()) { editor.style.color = ''; notesHL.style.color = ''; }
+    else if (colored) { editor.style.color = ''; notesHL.style.color = textColor || ''; }
+    else { editor.style.color = textColor || ''; notesHL.style.color = ''; }
+    document.getElementById('textColorBar').style.background = textColor || 'var(--accent)';
+  }
+  function applyTextColor() { updateColoredMode(); }
+
+  // Live overlay: render editor text with per-char colour spans + ==highlight== marks
   function renderNotesHighlight() {
     if (isCodeMode()) { notesHL.classList.remove('active'); return; }
-    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    notesHL.innerHTML = esc(editor.value).replace(/==([^=\n]+)==/g, m => `<mark>${m}</mark>`) + '\n';
+    const text = editor.value, n = text.length;
+    // highlight ranges from ==...==
+    const hl = new Uint8Array(n);
+    let m; const re = /==([^=\n]+)==/g;
+    while ((m = re.exec(text))) for (let i = m.index; i < m.index + m[0].length; i++) hl[i] = 1;
+    // colour per char from ranges
+    const col = new Array(n).fill(null);
+    colorRanges.forEach(r => { for (let i = Math.max(0, r.s); i < Math.min(n, r.e); i++) col[i] = r.c; });
+    // group consecutive chars sharing (colour, highlight) into spans
+    let html = '', curC = null, curH = 0, buf = '';
+    const flush = () => {
+      if (!buf) return;
+      let s = buf;
+      if (curH) s = `<mark>${s}</mark>`;
+      if (curC) s = `<span style="color:${curC}">${s}</span>`;
+      html += s; buf = '';
+    };
+    for (let i = 0; i < n; i++) {
+      if (col[i] !== curC || hl[i] !== curH) { flush(); curC = col[i]; curH = hl[i]; }
+      buf += escC(text[i]);
+    }
+    flush();
+    notesHL.innerHTML = html + '\n';
     notesHL.classList.add('active');
     notesHL.scrollTop = editor.scrollTop;
     notesHL.scrollLeft = editor.scrollLeft;
   }
   editor.addEventListener('scroll', () => { if (!isCodeMode()) { notesHL.scrollTop = editor.scrollTop; notesHL.scrollLeft = editor.scrollLeft; } });
 
-  // ── Text colour (per note, screen only) & highlight colour ──
-  let textColor = '';   // reflects the active note's chosen colour
-  let hlColor   = localStorage.getItem('quillpad_hlColor')   || '';
-  const TEXT_COLORS = ['#e05c5c', '#e8873c', '#e6c020', '#57bd6b', '#33bdbd', '#5c8ce0', '#7c6af7', '#c56ae0', '#e06aa8', '#9aa0aa'];
-  const HL_COLORS   = ['rgba(255,224,100,0.5)', 'rgba(124,247,150,0.4)', 'rgba(120,190,255,0.45)', 'rgba(255,150,200,0.45)', 'rgba(124,106,247,0.42)', 'rgba(255,170,90,0.5)'];
-
-  function applyTextColor() {
-    if (!isCodeMode()) editor.style.color = textColor || '';
-    document.getElementById('textColorBar').style.background = textColor || 'var(--accent)';
+  // Keep colour ranges aligned as the text is edited
+  function remapRanges(oldT, newT) {
+    if (oldT === newT || !colorRanges.length) return;
+    let p = 0; const minLen = Math.min(oldT.length, newT.length);
+    while (p < minLen && oldT[p] === newT[p]) p++;
+    let sfx = 0;
+    while (sfx < minLen - p && oldT[oldT.length - 1 - sfx] === newT[newT.length - 1 - sfx]) sfx++;
+    const oldEnd = oldT.length - sfx, delta = newT.length - oldT.length;
+    const map = pos => {
+      if (pos <= p) return pos;
+      if (pos >= oldEnd) return pos + delta;
+      return p;                       // inside the edited region → collapse to the edit point
+    };
+    colorRanges = colorRanges
+      .map(r => ({ s: map(r.s), e: (r.s < oldEnd && r.e > p && r.s <= p && r.e >= oldEnd) ? r.e + delta : map(r.e), c: r.c }))
+      .filter(r => r.e > r.s);
   }
-  // Persist the colour on the active note (not globally) — it's a per-note style
-  function setNoteTextColor(c) {
-    textColor = c;
+
+  function saveNoteColors() {
     const notes = loadNotes();
     const i = notes.findIndex(n => n.id === getActiveId());
-    if (i !== -1) { notes[i].textColor = c || undefined; saveNotes(notes, true); }  // silent: a style tweak, not a content edit
-    applyTextColor();
+    if (i !== -1) { notes[i].colors = colorRanges.length ? colorRanges : undefined; saveNotes(notes, true); }
+  }
+  // Remove any colour within [a, b) (splitting ranges) — used for "Default" on a selection
+  function clearColorSpan(ranges, a, b) {
+    const out = [];
+    ranges.forEach(r => {
+      if (r.e <= a || r.s >= b) { out.push(r); return; }
+      if (r.s < a) out.push({ s: r.s, e: a, c: r.c });
+      if (r.e > b) out.push({ s: b, e: r.e, c: r.c });
+    });
+    return out;
+  }
+
+  // The colour tool: recolour the selection (Word-style), or the whole note if nothing is selected
+  function applyColorPick(color, sel) {
+    const a = sel ? sel.a : editor.selectionStart, b = sel ? sel.b : editor.selectionEnd;
+    if (a !== b) {
+      colorRanges = clearColorSpan(colorRanges, a, b);
+      if (color) colorRanges.push({ s: a, e: b, c: color });
+      colorRanges.sort((x, y) => x.s - y.s);
+      saveNoteColors();
+    } else {
+      textColor = color;
+      const notes = loadNotes();
+      const i = notes.findIndex(n => n.id === getActiveId());
+      if (i !== -1) { notes[i].textColor = color || undefined; saveNotes(notes, true); }
+    }
+    updateColoredMode();
+    renderNotesHighlight();
   }
   function applyHlColor() {
     if (hlColor) document.documentElement.style.setProperty('--hl-color', hlColor);
@@ -1849,14 +1932,16 @@
 
   document.getElementById('textColorBtn').addEventListener('click', e => {
     if (popOpenFor('text')) { closePopup(); return; }
+    const sel = { a: editor.selectionStart, b: editor.selectionEnd };   // capture before focus moves
+    const hasSel = sel.a !== sel.b;
     openPopup(e.currentTarget, swatchGrid(TEXT_COLORS, textColor, true) +
-      `<div class="pop-row"><input type="color" id="textColorCustom" value="${textColor || '#7c6af7'}"><span>Custom · screen only</span></div>`);
+      `<div class="pop-row"><input type="color" id="textColorCustom" value="${textColor || '#7c6af7'}"><span>${hasSel ? 'Colours the selected text' : 'Whole note · select text first for one word'}</span></div>`);
     popMenu.dataset.for = 'text';
     popMenu.querySelectorAll('.pop-swatch').forEach(s => s.addEventListener('click', () => {
-      setNoteTextColor(s.dataset.color); closePopup(); editor.focus();
+      applyColorPick(s.dataset.color, sel); closePopup(); editor.focus();
     }));
     popMenu.querySelector('#textColorCustom').addEventListener('input', ev => {
-      setNoteTextColor(ev.target.value);
+      applyColorPick(ev.target.value, sel);
     });
   });
 
@@ -2144,9 +2229,10 @@
     // No soft-wrap in code mode, so line numbers stay 1:1 with real lines
     editor.setAttribute('wrap', code ? 'off' : 'soft');
     // In code mode the font is always monospace; otherwise honour the font picker
-    if (code) { editor.style.fontFamily = ''; editor.style.fontSize = ''; editor.style.color = ''; }
-    else { applyEditorFont(document.getElementById('fontSelect').value); applyTextColor(); }
+    if (code) { editor.style.fontFamily = ''; editor.style.fontSize = ''; }
+    else applyEditorFont(document.getElementById('fontSelect').value);
     if (!code) codeOutput.srcdoc = '';
+    updateColoredMode();   // handles both modes (clears notes-colored in code mode)
     updateStats();
     updatePreview();
     renderNotesHighlight();
