@@ -85,6 +85,72 @@
     }
     .sidebar.collapsed { width: 0; min-width: 0; border-right-color: transparent; }
 
+    /* ── Desk mode (binder workspace) ── */
+    .desk-view { display: none; }
+    body.desk-mode .desk-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    body.desk-mode .sidebar-toolbar, body.desk-mode .backup-banner,
+    body.desk-mode .tree, body.desk-mode .bulk-bar { display: none !important; }
+    body.desk-mode .sidebar { width: 270px; min-width: 270px; }
+    body.desk-mode .sidebar.collapsed { width: 0; min-width: 0; }
+
+    .desk-top { padding: 0 10px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .desk-binder {
+      display: flex; align-items: center; gap: 6px; width: 100%;
+      background: var(--btn-bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 7px 9px; color: var(--text); font-size: 0.82rem; font-weight: 700; text-align: left;
+    }
+    .desk-binder:hover { background: var(--btn-hover); }
+    .desk-binder .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .desk-binder svg { color: var(--accent); flex-shrink: 0; }
+    .desk-exit {
+      margin-top: 8px; background: none; border: none; color: var(--muted2);
+      font-size: 0.72rem; font-weight: 600; padding: 2px 2px; display: flex; align-items: center; gap: 4px;
+    }
+    .desk-exit:hover { color: var(--text); }
+
+    .desk-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 10px 12px 4px; font-size: 0.7rem; color: var(--muted2); flex-shrink: 0; }
+    .desk-crumb { background: none; border: none; color: var(--muted2); font-size: 0.7rem; font-weight: 600; padding: 2px 4px; border-radius: 4px; }
+    .desk-crumb:hover { background: var(--btn-hover); color: var(--text); }
+    .desk-crumb.cur { color: var(--text); cursor: default; }
+    .desk-crumb.cur:hover { background: none; }
+
+    .desk-tabs { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 10px 8px; flex-shrink: 0; }
+    .desk-tab {
+      --tab: var(--accent);
+      display: flex; align-items: center; gap: 5px; max-width: 100%;
+      background: var(--btn-bg); border: 1px solid var(--border); border-bottom: 3px solid var(--tab);
+      border-radius: 7px 7px 4px 4px; padding: 5px 9px 4px; color: var(--text);
+      font-size: 0.74rem; font-weight: 600;
+    }
+    .desk-tab:hover { background: var(--btn-hover); }
+    .desk-tab .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+    .desk-tab .ct { color: var(--muted2); font-weight: 500; font-size: 0.66rem; }
+    .desk-tab.add { border-bottom-color: var(--border); color: var(--muted2); border-style: dashed; border-bottom-style: dashed; }
+
+    .desk-newpage {
+      margin: 2px 10px 8px; display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 10px; border-radius: 9px; border: none; background: var(--accent); color: #fff;
+      font-size: 0.85rem; font-weight: 700; flex-shrink: 0;
+    }
+    .desk-newpage:hover { background: var(--accent-hover); }
+    .desk-newpage kbd { font: inherit; font-size: 0.64rem; font-weight: 600; opacity: 0.8; border: 1px solid rgba(255,255,255,0.45); border-radius: 4px; padding: 0 5px; }
+
+    .desk-pages { flex: 1; overflow-y: auto; padding: 2px 6px 12px; }
+    .desk-page {
+      display: flex; align-items: center; gap: 8px; padding: 8px 8px; margin: 1px 4px;
+      border-radius: 7px; border: 1.5px solid transparent; font-size: 0.8rem; color: var(--text);
+    }
+    .desk-page:hover { background: var(--item-hover); border-color: var(--accent); }
+    .desk-page.active { background: var(--item-active); }
+    .desk-page .pn { width: 22px; flex-shrink: 0; text-align: right; color: var(--muted); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+    .desk-page.active .pn, .desk-page.active .nm { color: var(--accent); }
+    .desk-page .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    .desk-page .x { opacity: 0; background: none; border: none; color: var(--muted2); padding: 2px 4px; border-radius: 4px; display: flex; }
+    .desk-page:hover .x { opacity: 1; }
+    .desk-page .x:hover { color: #e05c5c; background: rgba(224,92,92,0.12); }
+    @media (hover: none) { .desk-newpage kbd { display: none; } }
+    .desk-empty { padding: 18px 14px; text-align: center; font-size: 0.78rem; color: var(--muted2); line-height: 1.5; }
+
     .sidebar-header {
       display: flex; align-items: center;
       padding: 13px 14px 11px; flex-shrink: 0;
@@ -766,6 +832,11 @@
             <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
         </button>
+        <button class="sb-btn" id="deskBtn" title="Open a desk (binder workspace for a folder)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="3" width="15" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><path d="M3 7h3M3 12h3M3 17h3"/>
+          </svg>
+        </button>
         <button class="sb-btn" id="manageBtn" title="Manage notes &amp; folders">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.4"/><circle cx="4" cy="12" r="1.4"/><circle cx="4" cy="18" r="1.4"/>
@@ -798,6 +869,7 @@
       </button>
     </div>
     <div class="tree" id="tree"></div>
+    <div class="desk-view" id="deskView"></div>
     <div class="bulk-bar" id="bulkBar">
       <span class="bulk-count" id="bulkCount">0 selected</span>
       <div class="bulk-actions">
@@ -1046,6 +1118,7 @@
 
   // ── Tree render ───────────────────────────────────────────
   function renderTree() {
+    if (isDesk()) { renderDesk(); return; }   // desk mode swaps the tree for the binder navigator
     const notes    = loadNotes();
     const folders  = loadFolders();
     const activeId = getActiveId();
@@ -1303,6 +1376,9 @@
       <div class="ctx-item" data-action="new-note-in" data-folder="${folderId}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New note here</div>
+      <div class="ctx-item" data-action="open-desk" data-folder="${folderId}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="15" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><path d="M3 7h3M3 12h3M3 17h3"/></svg>
+        Open as desk</div>
       <div class="ctx-item" data-action="new-subfolder" data-folder="${folderId}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
         New subfolder</div>
@@ -1336,6 +1412,7 @@
         if (action === 'rename-folder-ctx') { closeCtxMenu(); const row = treeEl.querySelector(`.folder-row[data-folder-id="${item.dataset.id}"]`); if (row) startFolderRename(item.dataset.id, row); }
         if (action === 'delete-folder-ctx') deleteFolder(item.dataset.id);
         if (action === 'new-note-in')       newNoteInFolder(item.dataset.folder);
+        if (action === 'open-desk')         enterDesk(item.dataset.folder);
         if (action === 'new-subfolder')     createFolder(item.dataset.folder);
         closeCtxMenu();
       });
@@ -1541,9 +1618,169 @@
         && !document.getElementById('modalOverlay').classList.contains('show')) closeManage();
   });
 
+  // ── Desk (binder workspace) ───────────────────────────────
+  // A desk opens one folder as a binder: subfolders are section tabs (drill down),
+  // notes in the current folder are numbered pages in creation order. Same notes,
+  // same editor — it just swaps the sidebar for a faster navigator.
+  const deskView = document.getElementById('deskView');
+  let deskRoot = null, deskCwd = null;
+  const isDesk = () => document.body.classList.contains('desk-mode');
+  const noteCreated = n => n.created || parseInt((n.id || '').slice(0, 8), 36) || 0;
+  const pagesIn = (notes, fid) => notes.filter(n => n.folderId === fid).sort((a, b) => noteCreated(a) - noteCreated(b));
+
+  function saveDeskState() {
+    localStorage.setItem('quillpad_deskOn', isDesk() ? '1' : '0');
+    if (deskRoot) { localStorage.setItem('quillpad_deskRoot', deskRoot); localStorage.setItem('quillpad_deskCwd', deskCwd || deskRoot); }
+  }
+
+  function renderDesk() {
+    const folders = loadFolders(), notes = loadNotes();
+    const root = folders.find(f => f.id === deskRoot);
+    if (!root) { exitDesk(); return; }                       // binder was deleted
+    if (!folders.some(f => f.id === deskCwd)) deskCwd = deskRoot;
+    // breadcrumb: binder > section > subsection
+    const path = []; let cur = folders.find(f => f.id === deskCwd);
+    while (cur) { path.unshift(cur); if (cur.id === deskRoot) break; cur = folders.find(f => f.id === cur.parentId); }
+    const crumbs = path.map((f, i) => i === path.length - 1
+      ? `<button class="desk-crumb cur">${escHtml(f.name)}</button>`
+      : `<button class="desk-crumb" data-go="${f.id}">${escHtml(f.name)}</button><span>›</span>`).join('');
+    const subs = childFolders(folders, deskCwd);
+    const tabs = subs.map((f, i) => {
+      const count = notes.filter(n => n.folderId === f.id).length;
+      return `<button class="desk-tab" style="--tab:hsl(${(250 + i * 57) % 360} 62% 62%)" data-go="${f.id}" data-rename="${f.id}" title="Open section · double-click to rename">
+        <span class="nm">${escHtml(f.name)}</span><span class="ct">${count}</span></button>`;
+    }).join('') + `<button class="desk-tab add" data-new-section>+ Section</button>`;
+    const pages = pagesIn(notes, deskCwd), activeId = getActiveId();
+    const list = pages.length ? pages.map((n, i) => `
+      <div class="desk-page${n.id === activeId ? ' active' : ''}" data-open="${n.id}">
+        <span class="pn">${i + 1}</span><span class="nm">${escHtml(n.title || 'Untitled')}</span>
+        <button class="x" data-del="${n.id}" title="Delete page">${TRASH_SVG}</button></div>`).join('')
+      : `<div class="desk-empty">No pages in <b>${escHtml(path[path.length - 1].name)}</b> yet.<br>Hit <b>New page</b> to start writing.</div>`;
+
+    deskView.innerHTML = `
+      <div class="desk-top">
+        <button class="desk-binder" data-pick title="Switch binder">${FOLDER_SVG}<span class="nm">${escHtml(root.name)}</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+        <button class="desk-exit" data-exit>← Back to all notes</button>
+      </div>
+      <div class="desk-crumbs">${crumbs}</div>
+      <div class="desk-tabs">${tabs}</div>
+      <button class="desk-newpage" data-new-page title="New page (Alt+N)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New page <kbd>Alt+N</kbd></button>
+      <div class="desk-pages">${list}</div>`;
+  }
+
+  // Show the most recent page of the current section so the editor matches what's selected
+  function deskOpenLatest() {
+    if (isMobile()) return;   // on phones, opening a page closes the panel — let the user pick
+    const pages = pagesIn(loadNotes(), deskCwd);
+    if (!pages.length) return;
+    if (pages.some(p => p.id === getActiveId())) return;
+    switchNote(pages.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0].id);
+  }
+
+  function enterDesk(folderId) {
+    if (!folderId) { deskPicker(document.getElementById('deskBtn')); return; }
+    if (!loadFolders().some(f => f.id === folderId)) return;
+    closePopup();
+    deskRoot = folderId; deskCwd = folderId;
+    document.body.classList.add('desk-mode');
+    if (selectMode) setSelectMode(false);
+    setSidebar(true);
+    saveDeskState();
+    renderDesk();
+    deskOpenLatest();
+  }
+  function exitDesk() {
+    document.body.classList.remove('desk-mode');
+    saveDeskState();
+    renderTree();
+  }
+  function deskGo(fid) { deskCwd = fid; saveDeskState(); renderDesk(); deskOpenLatest(); }
+
+  function deskNewPage() {
+    if (!isDesk()) return;
+    const all = loadNotes(), pages = pagesIn(all, deskCwd);
+    const nums = pages.map(p => (/^Page (\d+)$/.exec(p.title || '') || [])[1]).filter(Boolean).map(Number);
+    const note = { id: uid(), title: `Page ${Math.max(pages.length, ...nums, 0) + 1}`, content: '', folderId: deskCwd, updatedAt: Date.now(), created: Date.now() };
+    all.unshift(note); saveNotes(all);
+    switchNote(note.id);
+    // Land on the title with the name selected: type to rename, Enter/Tab to start writing
+    setTimeout(() => { titleEl.focus(); titleEl.select(); }, 0);
+  }
+
+  async function deskNewSection() {
+    const folders = loadFolders();
+    const name = await promptDialog({ title: 'New section', message: 'Name the tab — e.g. "Module 2" or "Lesson 5".',
+      value: `Section ${childFolders(folders, deskCwd).length + 1}`, confirmText: 'Create', icon: 'save' });
+    if (!name) return;
+    const f = { id: uid(), name, collapsed: false, parentId: deskCwd };
+    folders.push(f); saveFolders(folders);
+    deskCwd = f.id; saveDeskState();
+    deskNewPage();
+  }
+
+  async function deskNewBinder() {
+    const name = await promptDialog({ title: 'New binder', message: 'Name your binder — e.g. the course title.',
+      value: 'My Course', confirmText: 'Create', icon: 'save' });
+    if (!name) return;
+    const folders = loadFolders();
+    const f = { id: uid(), name, collapsed: false, parentId: null };
+    folders.push(f); saveFolders(folders);
+    enterDesk(f.id);
+    deskNewPage();
+  }
+
+  function deskPicker(anchor) {
+    if (popOpenFor('desk')) { closePopup(); return; }
+    const folders = loadFolders();
+    let rows = '';
+    (function walk(pid, depth) {
+      childFolders(folders, pid).forEach(f => {
+        rows += `<div class="pop-divider" style="font-family:inherit;font-size:0.8rem;padding-left:${9 + depth * 14}px" data-binder="${f.id}">${escHtml(f.name)}</div>`;
+        walk(f.id, depth + 1);
+      });
+    })(null, 0);
+    rows += `<div class="pop-divider" style="font-family:inherit;font-size:0.8rem;color:var(--accent);font-weight:700" data-newbinder>＋ New binder</div>`;
+    openPopup(anchor, `<div class="pop-divider-list" style="min-width:210px">${rows}</div>`);
+    popMenu.dataset.for = 'desk';
+    popMenu.querySelectorAll('[data-binder]').forEach(el => el.addEventListener('click', () => enterDesk(el.dataset.binder)));
+    popMenu.querySelector('[data-newbinder]').addEventListener('click', () => { closePopup(); deskNewBinder(); });
+  }
+
+  deskView.addEventListener('click', async e => {
+    const t = e.target.closest('[data-go],[data-open],[data-del],[data-new-page],[data-new-section],[data-exit],[data-pick]');
+    if (!t) return;
+    if (t.hasAttribute('data-del'))          { e.stopPropagation(); await confirmDeleteNote(t.dataset.del); return; }
+    if (t.hasAttribute('data-open'))         { switchNote(t.dataset.open); return; }
+    if (t.hasAttribute('data-go'))           { deskGo(t.dataset.go); return; }
+    if (t.hasAttribute('data-new-page'))     { deskNewPage(); return; }
+    if (t.hasAttribute('data-new-section'))  { deskNewSection(); return; }
+    if (t.hasAttribute('data-exit'))         { exitDesk(); return; }
+    if (t.hasAttribute('data-pick'))         { deskPicker(t); return; }
+  });
+  deskView.addEventListener('dblclick', async e => {
+    const t = e.target.closest('[data-rename]');
+    if (!t) return;
+    const folders = loadFolders(), f = folders.find(x => x.id === t.dataset.rename);
+    if (!f) return;
+    const name = await promptDialog({ title: 'Rename section', message: 'Enter a new name.', value: f.name, confirmText: 'Rename', icon: 'save' });
+    if (name) { f.name = name; saveFolders(folders); renderTree(); }
+  });
+
+  document.getElementById('deskBtn').addEventListener('click', () => {
+    if (isDesk()) { exitDesk(); return; }
+    enterDesk(deskRoot && loadFolders().some(f => f.id === deskRoot) ? deskRoot : null);
+  });
+  // Alt+N → new page, from anywhere (even while typing)
+  document.addEventListener('keydown', e => {
+    if (isDesk() && e.altKey && !e.metaKey && !e.ctrlKey && e.code === 'KeyN') { e.preventDefault(); deskNewPage(); }
+  });
+
   // ── Note CRUD ─────────────────────────────────────────────
   function newNoteInFolder(folderId) {
-    const note = { id: uid(), title: '', content: '', folderId: folderId || null, updatedAt: Date.now() };
+    const note = { id: uid(), title: '', content: '', folderId: folderId || null, updatedAt: Date.now(), created: Date.now() };
     const notes = loadNotes();
     notes.unshift(note);
     saveNotes(notes);
@@ -1601,7 +1838,7 @@
   titleEl.addEventListener('input', saveActive);
   // Tab from the title jumps straight into the note body (skip toolbar buttons)
   titleEl.addEventListener('keydown', e => {
-    if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); editor.focus(); }
+    if ((e.key === 'Tab' && !e.shiftKey) || e.key === 'Enter') { e.preventDefault(); editor.focus(); }
   });
 
   async function confirmDeleteNote(id) {
@@ -1920,7 +2157,7 @@
   function closePopup() { popMenu.classList.remove('visible'); }
   const popOpenFor = a => popMenu.classList.contains('visible') && popMenu.dataset.for === a;
   document.addEventListener('mousedown', e => {
-    if (!popMenu.contains(e.target) && !e.target.closest('#textColorBtn,#hlColorBtn,#dividerBtn')) closePopup();
+    if (!popMenu.contains(e.target) && !e.target.closest('#textColorBtn,#hlColorBtn,#dividerBtn,#deskBtn,.desk-binder')) closePopup();
   });
 
   function swatchGrid(colors, current, extraNone) {
@@ -2864,6 +3101,14 @@
 
     renderTree();
     switchNote(activeId);
+    // Resume the desk if it was open when the app was last closed
+    const dRoot = localStorage.getItem('quillpad_deskRoot');
+    if (localStorage.getItem('quillpad_deskOn') === '1' && loadFolders().some(f => f.id === dRoot)) {
+      deskRoot = dRoot;
+      deskCwd = localStorage.getItem('quillpad_deskCwd') || dRoot;
+      document.body.classList.add('desk-mode');
+      renderDesk();
+    } else if (dRoot) { deskRoot = dRoot; }
     updateBackupStatus();
     updateLastEdit();
     if (window.matchMedia('(hover: hover)').matches) initTooltips();  // no hover on touch
