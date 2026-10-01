@@ -454,13 +454,25 @@
     .pop-swatch.none { display: flex; align-items: center; justify-content: center; background: var(--btn-bg); color: var(--muted2); font-size: 0.7rem; }
     .pop-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.75rem; color: var(--muted2); }
     .pop-row input[type=color] { width: 28px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
-    .pop-divider-list { display: flex; flex-direction: column; gap: 2px; min-width: 200px; max-height: 260px; overflow-y: auto; }
+    .pop-divider-list {
+      display: flex; flex-direction: column; gap: 2px; min-width: 200px;
+      max-height: min(340px, 60vh); overflow-y: auto; overscroll-behavior: contain;
+      scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    }
+    .pop-divider-list::-webkit-scrollbar { width: 6px; }
+    .pop-divider-list::-webkit-scrollbar-track { background: transparent; }
+    .pop-divider-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .pop-divider-list::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     .pop-divider {
+      flex-shrink: 0;   /* rows keep their height; the list scrolls instead of squishing them */
       padding: 7px 9px; border-radius: 6px; cursor: pointer;
       font-family: var(--code-font); font-size: 0.72rem; color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .pop-divider:hover { background: var(--item-hover); }
+    /* "＋ New binder" stays pinned at the bottom while the folder list scrolls */
+    .pop-divider.pinned { position: sticky; bottom: 0; background: var(--surface); box-shadow: 0 -6px 8px -4px var(--surface); }
+    .pop-divider.pinned:hover { background: var(--item-hover); }
 
     /* ── Code editor mode ── */
     .md-only { display: contents; }
@@ -1742,7 +1754,7 @@
         walk(f.id, depth + 1);
       });
     })(null, 0);
-    rows += `<div class="pop-divider" style="font-family:inherit;font-size:0.8rem;color:var(--accent);font-weight:700" data-newbinder>＋ New binder</div>`;
+    rows += `<div class="pop-divider pinned" style="font-family:inherit;font-size:0.8rem;color:var(--accent);font-weight:700" data-newbinder>＋ New binder</div>`;
     openPopup(anchor, `<div class="pop-divider-list" style="min-width:210px">${rows}</div>`);
     popMenu.dataset.for = 'desk';
     popMenu.querySelectorAll('[data-binder]').forEach(el => el.addEventListener('click', () => enterDesk(el.dataset.binder)));
